@@ -5,7 +5,7 @@ playground/*
 !playground/.gitkeep
 !playground/README.md
 
-# Real config with secrets (only the *.example.yaml is tracked)
+# The one project-specific file — never committed (created by /setup-config)
 config/hub.config.yaml
 
 # Obsidian local state
@@ -16,5 +16,6 @@ vault/.trash/
 # Python / misc
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 .DS_Store

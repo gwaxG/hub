@@ -6,9 +6,9 @@ phone access — built almost entirely from Claude Code plugins and connectors
 rather than a bespoke backend service.
 
 Nothing in this repo is tied to a particular company or project. Everything
-project-specific lives in **one file**: `config/hub.config.yaml` (copied from
-`config/hub.config.example.yaml`). Swap that file and the hub serves a
-different project.
+project-specific lives in **one file**: `config/hub.config.yaml`, created for
+you by the `/setup-config` skill. Swap that file and the hub serves a different
+project.
 
 ---
 
@@ -38,16 +38,20 @@ or a vector-memory MCP would duplicate it. (If Chroma's RAM use bites, switch
 
 ```
 hub/
-├── README.md                    # this file (the only markdown; other docs are HTML)
-├── config/
-│   ├── hub.config.example.yaml  # template (tracked)
-│   └── hub.config.yaml          # your real values + secrets (git-ignored)
-├── docs/                        # HTML documentation — open docs/index.html
-├── data/                        # generated HTML outputs: digests, snapshots (git-ignored)
-├── playground/                  # disposable scripts kept across sessions (git-ignored)
-├── workflows/                   # config-driven Workflow scripts (daily-brief, etc.)
-└── vault/                       # Obsidian vault = browsable knowledge graph
+├── README.md          # this file (the only markdown; other docs are HTML)
+├── CLAUDE.md          # how the pieces connect (the other tracked markdown)
+├── config/            # the ONE file: hub.config.yaml (git-ignored)
+├── workflows/         # full scripts: Workflow .js orchestration + uv-run Python
+├── .claude/skills/    # thin launchers (/setup-config, /daily-brief)
+├── docs/              # HTML documentation — open docs/index.html
+├── data/              # generated HTML outputs (git-ignored)
+├── playground/        # disposable/random scripts (git-ignored)
+└── vault/             # Obsidian vault = browsable knowledge graph
 ```
+
+All scripting is **Python via `uv`** (inline PEP 723 deps — no venv). A short
+one-liner lives inline in a skill; anything larger is a committed script in
+`workflows/`.
 
 Docs and generated data are **HTML** (open in a browser); code/config comments
 carry the rest. `README.md` is the single exception.
@@ -118,10 +122,16 @@ Schedules are declared in `config/hub.config.yaml` under `schedules:`.
 
 ## Make it yours
 
-```bash
-cp config/hub.config.example.yaml config/hub.config.yaml
-# edit hub.config.yaml: project_name, enable connectors, set schedules
+Run the setup skill — it interviews you and writes the single config file:
+
+```
+/setup-config
 ```
 
-That's the only file to touch. Keep secrets there (it's git-ignored) — never in
-committed files or in global `CLAUDE.md`.
+It asks for the project name and which connectors to enable, then writes and
+validates `config/hub.config.yaml` (via `uv run workflows/setup_config.py`).
+That's the only file that carries project specifics. It's git-ignored — keep
+selectors there, never in committed files or global `CLAUDE.md`. Connector
+*auth* lives in the Claude app / MCP connectors, not in any file here.
+
+Then run `/daily-brief` for the morning digest.
