@@ -1,0 +1,20 @@
+# Generated / disposable — never committed
+data/*
+!data/.gitkeep
+playground/*
+!playground/.gitkeep
+!playground/README.md
+
+# Real config with secrets (only the *.example.yaml is tracked)
+config/hub.config.yaml
+
+# Obsidian local state
+vault/.obsidian/workspace*
+vault/.obsidian/cache
+vault/.trash/
+
+# Python / misc
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
