@@ -20,7 +20,7 @@ service — duplicates capabilities Claude Code already ships. This hub instead
 
 | Need | What provides it | This hub adds |
 |------|------------------|---------------|
-| Long-term memory | `claude-mem` plugin (SQLite + local Chroma vectors) | curated Obsidian vault on top |
+| Long-term memory | `claude-mem` plugin (SQLite + local Chroma vectors) | a curated Markdown knowledge base in `docs/` on top |
 | Semantic recall | `claude-mem` (local `all-MiniLM-L6-v2` embeddings) | nothing — already local |
 | Tool access (Sentry/GitLab/Notion/Slack) | claude.ai MCP connectors | config-driven workflows |
 | Multi-agent orchestration | `superpowers` + `Agent`/`Workflow` tools | saved workflow scripts |
@@ -38,23 +38,22 @@ or a vector-memory MCP would duplicate it. (If Chroma's RAM use bites, switch
 
 ```
 hub/
-├── README.md          # this file (the only markdown; other docs are HTML)
-├── CLAUDE.md          # how the pieces connect (the other tracked markdown)
+├── README.md          # this file
+├── CLAUDE.md          # how the pieces connect
 ├── config/            # the ONE file: hub.config.yaml (git-ignored)
-├── workflows/         # full scripts: Workflow .js orchestration + uv-run Python
-├── .claude/skills/    # thin launchers (/setup-config, /daily-brief)
-├── docs/              # HTML documentation — open docs/index.html
-├── data/              # generated HTML outputs (git-ignored)
-├── playground/        # disposable/random scripts (git-ignored)
-└── vault/             # Obsidian vault = browsable knowledge graph
+├── workflows/         # full scripts: uv-run Python (no JS)
+├── .claude/skills/    # thin launchers (/setup-config, /daily-brief, /explain-repo)
+├── docs/              # the living Markdown knowledge base (per-project notes + ADRs)
+├── data/              # generated HTML outputs, e.g. digests (git-ignored)
+└── playground/        # disposable/random scripts (git-ignored)
 ```
 
-All scripting is **Python via `uv`** (inline PEP 723 deps — no venv). A short
-one-liner lives inline in a skill; anything larger is a committed script in
-`workflows/`.
+All scripting is **Python via `uv`** (inline PEP 723 deps — no venv, no JS). A
+short one-liner lives inline in a skill; anything larger is a committed Python
+script in `workflows/`.
 
-Docs and generated data are **HTML** (open in a browser); code/config comments
-carry the rest. `README.md` is the single exception.
+The `docs/` knowledge base is **Markdown** (cross-linked notes + ADRs, kept
+current by Claude). Other generated outputs (e.g. digests) are HTML in `data/`.
 
 ---
 
@@ -65,20 +64,17 @@ Two systems, clear division of labor — don't duplicate between them:
 - **`claude-mem` = automatic "what I did."** Captures observations every
   session and injects relevant context at the next `SessionStart`. Zero effort.
   Backed locally by SQLite (keyword) + Chroma (semantic).
-- **Obsidian vault = curated "what I decided / learned."** The stuff you'd show
-  a teammate: decisions, incident write-ups, architecture notes. Auto-organized
-  into an entity/concept graph you can open and browse in Obsidian.
+- **`docs/` = curated "what I've learned about the code."** A living, cross-linked
+  **Markdown knowledge base Claude maintains as it works**: one note per project
+  under `docs/workspace_graph/<group>/<repo>.md` (purpose, tech stack, architecture,
+  entry points, gotchas, `## Cross-references` to related repos), plus Architecture
+  Decision Records under `docs/adr/`.
 
-Install the vault layer:
-
-```bash
-claude plugin marketplace add AgriciDaniel/claude-obsidian
-claude plugin install claude-obsidian@agricidaniel-claude-obsidian
-# point the vault at ./vault, choose zettelkasten or para mode
-```
-
-Then `/save` a session into the vault, `/autoresearch <topic>` to build
-synthesis pages, and open `vault/` in Obsidian for the graph view.
+The rule (see `CLAUDE.md`): **read the relevant note before exploring a project;
+update it — or write it if missing — after you learn something durable; record
+design decisions as ADRs.** Use `/explain-repo <target>` to generate a project's
+note when one doesn't exist yet. No app or plugin required — it's plain Markdown
+you can read on GitHub or in any editor.
 
 ---
 

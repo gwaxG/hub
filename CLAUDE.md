@@ -1,8 +1,8 @@
 # CLAUDE.md — Claude Ops Hub
 
 This repo is a **project-agnostic control layer for Claude Code**, not an app.
-It wires together capabilities Claude Code already ships (claude-mem, the
-Obsidian vault, MCP connectors, `Workflow`/`Agent`) and adds only the glue.
+It wires together capabilities Claude Code already ships (claude-mem, MCP
+connectors, the `Agent` tool) and adds only the glue.
 Read `README.md` for the full rationale.
 
 ## The one rule
@@ -16,7 +16,11 @@ channel anywhere else; workflows and skills read the config.
 
 **All scripting is Python, run via `uv`** (`uv run ...`), with dependencies
 declared inline via PEP 723 headers — no venv, no `pyproject.toml`, no committed
-Python package.
+Python package. **No JavaScript.** Committed workflow scripts are Python only;
+do not add `Workflow` `.js` orchestration scripts. LLM fan-out (analyzing many
+repos, etc.) is done by dispatching the **Agent tool** from the launching skill,
+while the committed Python script owns the deterministic work (discovery, file
+I/O, indexing). (The legacy `daily-brief.workflow.js` predates this rule.)
 
 ## Where code goes
 
@@ -24,38 +28,37 @@ Python package.
   `config/hub.config.yaml` and emit JSON), put it directly in the skill as a
   `uv run --with pyyaml python - <<'PY' ...` block.
 - **More than a one-liner → `workflows/`.** Anything substantial is a committed
-  script under `workflows/` — either a `Workflow` `.js` orchestration script or a
-  `uv run` Python script. Skills stay thin: they read config inline (if needed),
-  then launch the workflow.
-
-Workflow `.js` scripts cannot read the filesystem, so all config-reading happens
-in the launching skill, never in the workflow.
+  **Python** script under `workflows/` (`uv run`). Skills stay thin: they read
+  config inline (if needed), run the Python script for deterministic work, and
+  dispatch Agent subagents for any LLM work.
 
 ## Memory: two layers, no overlap
 
 - **claude-mem** = automatic "what I did." Captured every session, re-injected
   at `SessionStart`. Zero effort. Local SQLite + Chroma.
-- **Obsidian vault (`vault/`)** = curated "what I decided / learned" **about the
-  codebase in this workspace** (this repo is the main working directory). A
-  browsable knowledge graph in **zettelkasten** mode: atomic notes, linked with
-  `[[wikilinks]]`, no folder hierarchy. This is where durable codebase knowledge
-  lives — architecture decisions, non-obvious mechanisms, gotchas, why something
-  is the way it is. Powered by the `claude-obsidian` plugin skills (see below).
-  Open `vault/` in the Obsidian app for the graph view. Don't add a third store.
+- **`docs/`** = curated "what I've learned about the code" — a **living Markdown
+  knowledge base Claude maintains as it works**, graph-like and cross-linked:
+  - **Per-project notes** at `docs/workspace_graph/<group>/<repo>.md` — purpose,
+    tech stack, architecture & key components, entry points, gotchas, and
+    `## Cross-references` to related repos (relative-path Markdown links, so the
+    set reads as a graph). `docs/workspace_graph/index.md` is the overview.
+  - **ADRs** at `docs/adr/NNNN-title.md` — architecture decisions: context,
+    decision, consequences.
 
-**Use the vault automatically — no need to be asked:**
+**Keep `docs/` current as you learn — no need to be asked:**
 
-- **Read before you explore.** Before diving into an unfamiliar part of the
-  codebase, run **`/wiki-query`** (or ask "what do you know about X?") to pull
-  what's already curated. Cite the vault pages, not guesses.
-- **Write after meaningful learning.** Once you learn something durable about
-  the codebase — a design decision, a non-obvious mechanism, a gotcha — capture
-  it with **`/save`** (a conversation/insight) or **`ingest`** (a source file
-  or doc). Do **not** save routine edits, restatements of the code, or
-  conversation-only trivia.
-- **Keep it healthy.** Occasionally run **`lint the wiki`** to surface orphans,
-  dead links, and stale claims; run **`/autoresearch`** only when you genuinely
-  need multi-source external research filed into the vault.
+- **Read before you explore.** Before diving into an unfamiliar project, read its
+  `docs/workspace_graph/…` note and any relevant ADR. Cite them, not guesses.
+- **Write/update after meaningful learning.** When you learn something durable —
+  how a project works, its structure, a design decision, a non-obvious mechanism,
+  a gotcha — update that project's note and link the related repos. **If a project
+  has no note yet, read the project and write one describing how it works and its
+  structure** (the `/explain-repo` skill does exactly this).
+- **Record decisions as ADRs.** When a design/architecture decision is made or
+  discovered, add or update an ADR under `docs/adr/`. **If an ADR that should
+  exist is missing, investigate the project and write it.**
+- Capture the non-obvious and the *why*; do **not** record routine edits or plain
+  restatements of the code.
 
 ## Folders
 
@@ -64,11 +67,11 @@ in the launching skill, never in the workflow.
   Python). All inputs via `args`.
 - **`.claude/skills/`** — thin launchers: read config inline (uv+pyyaml) if
   needed, then invoke the matching workflow.
-- **`docs/`** — HTML documentation, only when a workflow is genuinely hard to
-  follow. Open in a browser.
+- **`docs/`** — the living Markdown knowledge base Claude maintains: per-project
+  notes under `docs/workspace_graph/` (a cross-linked graph) and ADRs under
+  `docs/adr/`. May also hold the occasional HTML page for a hard-to-follow workflow.
 - **`playground/`** — disposable / random scripts (git-ignored).
-- **`data/`** — generated HTML outputs (git-ignored).
-- **`vault/`** — the Obsidian knowledge graph.
+- **`data/`** — generated HTML outputs, e.g. digests (git-ignored).
 
 ## Skills
 
@@ -77,22 +80,25 @@ in the launching skill, never in the workflow.
   `config/hub.config.yaml`.
 - **`/daily-brief`** — reads config inline, fans out over enabled connectors,
   writes one HTML digest to `data/digest-<date>.html`.
-
-**`claude-obsidian` skills — codebase memory (use automatically):**
-
-| Skill / trigger | Use when |
-|---|---|
-| **`/wiki-query`** ("what do you know about X?") | Before exploring an unfamiliar area — pull curated codebase knowledge first. |
-| **`/save`** ("save this") | After a session or discussion yields a durable decision/insight worth keeping. |
-| **`ingest [file]`** | To file a source doc, design note, or spec into the vault as linked pages. |
-| **`lint the wiki`** | Periodic health check — orphans, dead links, stale claims. |
-| **`/autoresearch [topic]`** | Only when multi-source external research needs to be filed into the vault. |
-| **`/wiki`** | First-run vault setup, or to continue where you left off. |
+- **`/explain-repo`** — documents cloned `workspace/` repos into the `docs/`
+  knowledge base: runs `workflows/explain_repo.py` to discover repos + build the
+  index, and dispatches an Agent per repo to write a cross-linked Markdown note
+  under `docs/workspace_graph/` (mirroring the workspace tree). Use it to create a
+  project's note when one is missing.
+- **`/changelog`** — watches what changed across `workspace/` repos since the last
+  run: runs `workflows/changelog.py plan` to diff every repo against a persisted
+  per-repo commit-SHA snapshot (`data/changelog_state.json`), dispatches an Agent
+  per changed repo to classify the change (routine/notable/architectural) and
+  update its `docs/workspace_graph` note (notable+) or draft an ADR under
+  `docs/adr/` (architectural), then `changelog.py record` appends a dated section
+  to the root `CHANGELOG.md` and advances the snapshot. Run after `/clone-repos`.
 
 ## Conventions
 
-- Generated outputs and docs are HTML. `README.md` and this file are the only
-  tracked markdown.
+- The `docs/` knowledge base is **Markdown** (per-project notes + ADRs), so it
+  reads as a cross-linked graph and stays diff-friendly. `README.md`, `CLAUDE.md`,
+  and everything under `docs/` are the tracked Markdown. Other generated outputs
+  (e.g. digests) are HTML written to `data/` (git-ignored).
 - **Secrets:** connector *auth* lives in the Claude app / MCP connectors, never
   in this repo. `hub.config.yaml` holds only non-secret selectors and is
   git-ignored.

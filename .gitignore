@@ -1,17 +1,18 @@
 # Generated / disposable — never committed
+workspace/*
 data/*
 !data/.gitkeep
 playground/*
 !playground/.gitkeep
 !playground/README.md
 
+# Knowledge base + specs are maintained locally per machine, not committed.
+# The docs/index.html landing page is the one deliberate exception.
+docs/*
+!docs/index.html
+
 # The one project-specific file — never committed (created by /setup-config)
 config/hub.config.yaml
-
-# Obsidian local state
-vault/.obsidian/workspace*
-vault/.obsidian/cache
-vault/.trash/
 
 # Python / misc
 __pycache__/

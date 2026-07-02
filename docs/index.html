@@ -57,14 +57,15 @@
     <table>
       <tr><th>Layer</th><th>Role</th><th>Backed by</th></tr>
       <tr><td><b>claude-mem</b></td><td>Automatic "what I did" — captured &amp; re-injected each session</td><td>SQLite + FTS5 &amp; local ChromaDB (all-MiniLM-L6-v2)</td></tr>
-      <tr><td><b>Obsidian vault</b></td><td>Curated "what I decided / learned" — browsable graph</td><td><code>claude-obsidian</code> plugin</td></tr>
+      <tr><td><b>docs/</b></td><td>Curated "what I've learned about the code" — a living, cross-linked Markdown knowledge base Claude maintains</td><td>plain Markdown: per-project notes in <code>docs/workspace_graph/</code> + ADRs in <code>docs/adr/</code></td></tr>
     </table>
     <div class="note"><b>No extra database.</b> claude-mem already does local
     keyword <em>and</em> semantic search. A separate sqlite-vec / vector MCP would
     duplicate it. If Chroma RAM gets heavy, switch claude-mem to SQLite-only mode.</div>
-    <pre><code>claude plugin marketplace add AgriciDaniel/claude-obsidian
-claude plugin install claude-obsidian@agricidaniel-claude-obsidian
-# vault -> ./vault, mode: zettelkasten | para</code></pre>
+    <p>The rule: <b>read the relevant project note before exploring; update it (or
+    write it, via <code>/explain-repo</code>) after learning something durable;
+    record design decisions as ADRs.</b> It's plain Markdown — readable on GitHub
+    or in any editor, no app required.</p>
   </section>
 
   <section id="workflows">
@@ -99,13 +100,13 @@ claude plugin install claude-obsidian@agricidaniel-claude-obsidian
   <section id="layout">
     <h2>Layout</h2>
     <pre><code>hub/
-├── README.md          the approach (markdown)
+├── README.md          the approach
+├── CLAUDE.md          how the pieces connect
 ├── config/            hub.config.yaml — the ONE project-specific file
-├── docs/              HTML documentation (this page)
+├── docs/              living Markdown knowledge base (per-project notes + ADRs) + this page
 ├── data/              generated HTML outputs (git-ignored)
 ├── playground/        disposable scripts (git-ignored)
-├── workflows/         config-driven Workflow scripts
-└── vault/             Obsidian knowledge graph</code></pre>
+└── workflows/         uv-run Python scripts (no JS)</code></pre>
   </section>
 </main>
 
