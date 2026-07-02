@@ -6,10 +6,9 @@ playground/*
 !playground/.gitkeep
 !playground/README.md
 
-# Knowledge base + specs are maintained locally per machine, not committed.
-# The docs/index.html landing page is the one deliberate exception.
-docs/*
-!docs/index.html
+# Knowledge base + specs are maintained locally per machine, not committed
+# (grows huge — one note per workspace repo).
+docs/
 
 # The one project-specific file — never committed (created by /setup-config)
 config/hub.config.yaml

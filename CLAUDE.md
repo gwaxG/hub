@@ -37,7 +37,10 @@ I/O, indexing). (The legacy `daily-brief.workflow.js` predates this rule.)
 - **claude-mem** = automatic "what I did." Captured every session, re-injected
   at `SessionStart`. Zero effort. Local SQLite + Chroma.
 - **`docs/`** = curated "what I've learned about the code" — a **living Markdown
-  knowledge base Claude maintains as it works**, graph-like and cross-linked:
+  knowledge base Claude maintains as it works**, graph-like and cross-linked.
+  It is **git-ignored (maintained locally per machine, not committed)** — it grows
+  huge (one note per workspace repo, 250+), so it stays out of version control.
+  Layout:
   - **Per-project notes** at `docs/workspace_graph/<group>/<repo>.md` — purpose,
     tech stack, architecture & key components, entry points, gotchas, and
     `## Cross-references` to related repos (relative-path Markdown links, so the
@@ -70,6 +73,7 @@ I/O, indexing). (The legacy `daily-brief.workflow.js` predates this rule.)
 - **`docs/`** — the living Markdown knowledge base Claude maintains: per-project
   notes under `docs/workspace_graph/` (a cross-linked graph) and ADRs under
   `docs/adr/`. May also hold the occasional HTML page for a hard-to-follow workflow.
+  **Git-ignored** — maintained locally per machine, not committed.
 - **`playground/`** — disposable / random scripts (git-ignored).
 - **`data/`** — generated HTML outputs, e.g. digests (git-ignored).
 
@@ -96,9 +100,10 @@ I/O, indexing). (The legacy `daily-brief.workflow.js` predates this rule.)
 ## Conventions
 
 - The `docs/` knowledge base is **Markdown** (per-project notes + ADRs), so it
-  reads as a cross-linked graph and stays diff-friendly. `README.md`, `CLAUDE.md`,
-  and everything under `docs/` are the tracked Markdown. Other generated outputs
-  (e.g. digests) are HTML written to `data/` (git-ignored).
+  reads as a cross-linked graph and stays diff-friendly, but it is **git-ignored**
+  (maintained locally per machine — it grows too large to commit). The tracked
+  Markdown is `README.md` and `CLAUDE.md`. Other generated outputs (e.g. digests)
+  are HTML written to `data/` (git-ignored).
 - **Secrets:** connector *auth* lives in the Claude app / MCP connectors, never
   in this repo. `hub.config.yaml` holds only non-secret selectors and is
   git-ignored.
