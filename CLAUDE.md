@@ -2,110 +2,85 @@
 
 This repo is a **project-agnostic control layer for Claude Code**, not an app.
 It wires together capabilities Claude Code already ships (claude-mem, MCP
-connectors, the `Agent` tool) and adds only the glue.
+connectors, the `Agent` tool, git worktrees) and adds only the glue.
 Read `README.md` for the full rationale.
 
-## The one rule
-
-**Everything project-specific lives in `config/hub.config.yaml`** (git-ignored).
-There is exactly one config file — no template, no example. It is created for
-you by the `/setup-config` skill. Do not hardcode an org, project, group, or
-channel anywhere else; workflows and skills read the config.
+Its job today: **observe the workspace repos and do real work in them via
+on-demand git worktrees, backed by long-term memory.**
 
 ## Language
 
 **All scripting is Python, run via `uv`** (`uv run ...`), with dependencies
 declared inline via PEP 723 headers — no venv, no `pyproject.toml`, no committed
-Python package. **No JavaScript.** Committed workflow scripts are Python only;
-do not add `Workflow` `.js` orchestration scripts. LLM fan-out (analyzing many
-repos, etc.) is done by dispatching the **Agent tool** from the launching skill,
-while the committed Python script owns the deterministic work (discovery, file
-I/O, indexing). (The legacy `daily-brief.workflow.js` predates this rule.)
+Python package. **No JavaScript.** LLM fan-out (analyzing many repos, etc.) is
+done by dispatching the **Agent tool** from the launching skill, while the
+committed Python script owns the deterministic work (discovery, file I/O).
 
 ## Where code goes
 
-- **One-liner → a skill.** If the logic is a short inline snippet (e.g. read
-  `config/hub.config.yaml` and emit JSON), put it directly in the skill as a
-  `uv run --with pyyaml python - <<'PY' ...` block.
+- **One-liner → a skill.** A short inline snippet goes directly in the skill as a
+  `uv run --with … python - <<'PY' …` block.
 - **More than a one-liner → `workflows/`.** Anything substantial is a committed
-  **Python** script under `workflows/` (`uv run`). Skills stay thin: they read
-  config inline (if needed), run the Python script for deterministic work, and
-  dispatch Agent subagents for any LLM work.
+  **Python** script under `workflows/` (`uv run`). Skills stay thin: they run the
+  Python script for deterministic work and dispatch Agent subagents for LLM work.
 
 ## Memory: two layers, no overlap
 
 - **claude-mem** = automatic "what I did." Captured every session, re-injected
-  at `SessionStart`. Zero effort. Local SQLite + Chroma.
-- **`docs/`** = curated "what I've learned about the code" — a **living Markdown
-  knowledge base Claude maintains as it works**, graph-like and cross-linked.
-  It is **git-ignored (maintained locally per machine, not committed)** — it grows
-  huge (one note per workspace repo, 250+), so it stays out of version control.
-  Layout:
-  - **Per-project notes** at `docs/workspace_graph/<group>/<repo>.md` — purpose,
-    tech stack, architecture & key components, entry points, gotchas, and
-    `## Cross-references` to related repos (relative-path Markdown links, so the
-    set reads as a graph). `docs/workspace_graph/index.md` is the overview.
-  - **ADRs** at `docs/adr/NNNN-title.md` — architecture decisions: context,
-    decision, consequences.
+  at `SessionStart`. Zero effort. Local SQLite + Chroma. It provides its own
+  session-start context injection — the hub adds no memory hooks of its own.
+- **`wiki/`** = curated "what the code is and why." A self-contained **Obsidian
+  vault** (Mode B: codebase / architecture map) at `~/dev/hub/wiki/`, maintained
+  by you and Claude via the `claude-obsidian` plugin (`ingest`, `query`, `lint`).
+  It is **git-ignored** (machine-local). Structure and conventions live in
+  `wiki/CLAUDE.md`. claude-mem records *what happened*; the wiki records *what the
+  code is*.
 
-**Keep `docs/` current as you learn — no need to be asked:**
+Keep the wiki current as you learn something durable about a codebase — ingest a
+source or update the relevant note. Capture the non-obvious and the *why*; skip
+routine edits and plain restatements of the code.
 
-- **Read before you explore.** Before diving into an unfamiliar project, read its
-  `docs/workspace_graph/…` note and any relevant ADR. Cite them, not guesses.
-- **Write/update after meaningful learning.** When you learn something durable —
-  how a project works, its structure, a design decision, a non-obvious mechanism,
-  a gotcha — update that project's note and link the related repos. **If a project
-  has no note yet, read the project and write one describing how it works and its
-  structure** (the `/explain-repo` skill does exactly this).
-- **Record decisions as ADRs.** When a design/architecture decision is made or
-  discovered, add or update an ADR under `docs/adr/`. **If an ADR that should
-  exist is missing, investigate the project and write it.**
-- Capture the non-obvious and the *why*; do **not** record routine edits or plain
-  restatements of the code.
+## Working on workspace repos: git worktrees
+
+Repos are mirrored under `workspace/<group>/…/<repo>` by `/clone-repos`. To work
+on one, **do it in a git worktree**, not on the clone's main checkout:
+
+- Use the built-in worktree support (`EnterWorktree`) or the
+  `superpowers:using-git-worktrees` skill to create an isolated worktree + branch
+  off the target repo.
+- Make changes there, run tests, then open an MR / merge, and remove the worktree
+  when done.
+- This keeps the pristine `workspace/` clones clean (so `/clone-repos` can always
+  fast-forward them) and isolates parallel work.
 
 ## Folders
 
-- **`config/`** — the single `hub.config.yaml`. Nothing else.
-- **`workflows/`** — full scripts (`Workflow` `.js` orchestration, or `uv run`
-  Python). All inputs via `args`.
-- **`.claude/skills/`** — thin launchers: read config inline (uv+pyyaml) if
-  needed, then invoke the matching workflow.
-- **`docs/`** — the living Markdown knowledge base Claude maintains: per-project
-  notes under `docs/workspace_graph/` (a cross-linked graph) and ADRs under
-  `docs/adr/`. May also hold the occasional HTML page for a hard-to-follow workflow.
-  **Git-ignored** — maintained locally per machine, not committed.
+- **`workspace/`** — mirrored clones of the workspace repos (git-ignored).
+- **`wiki/`** — the curated Obsidian long-term-memory vault (git-ignored).
+- **`workflows/`** — full `uv run` Python scripts. All inputs via `args`.
+- **`.claude/skills/`** — thin launchers that invoke a workflow.
+- **`config/`** — holds `hub.config.yaml` (git-ignored). Currently **vestigial**:
+  the remaining `clone-repos` skill hardcodes its own group list, so nothing reads
+  this file today. Kept for future config-driven skills.
 - **`playground/`** — disposable / random scripts (git-ignored).
-- **`data/`** — generated HTML outputs, e.g. digests (git-ignored).
+- **`data/`** — generated outputs (git-ignored).
 
 ## Skills
 
-- **`/setup-config`** — interactive: asks for project name + which connectors to
-  enable, then runs `workflows/setup_config.py` to write and validate
-  `config/hub.config.yaml`.
-- **`/daily-brief`** — reads config inline, fans out over enabled connectors,
-  writes one HTML digest to `data/digest-<date>.html`.
-- **`/explain-repo`** — documents cloned `workspace/` repos into the `docs/`
-  knowledge base: runs `workflows/explain_repo.py` to discover repos + build the
-  index, and dispatches an Agent per repo to write a cross-linked Markdown note
-  under `docs/workspace_graph/` (mirroring the workspace tree). Use it to create a
-  project's note when one is missing.
-- **`/changelog`** — watches what changed across `workspace/` repos since the last
-  run: runs `workflows/changelog.py plan` to diff every repo against a persisted
-  per-repo commit-SHA snapshot (`data/changelog_state.json`), dispatches an Agent
-  per changed repo to classify the change (routine/notable/architectural) and
-  update its `docs/workspace_graph` note (notable+) or draft an ADR under
-  `docs/adr/` (architectural), then `changelog.py record` appends a dated section
-  to the root `CHANGELOG.md` and advances the snapshot. Run after `/clone-repos`.
+- **`/clone-repos`** — mirrors every GitLab project under the configured
+  `skillcorner` groups to `./workspace/<group>/…/<repo>`. Clones missing repos,
+  fast-forwards existing clean ones onto their default branch, and **skips any
+  repo with uncommitted changes**. Reads `GITLAB_TOKEN` from the environment (a
+  `read_api` + `read_repository` PAT); never stores it. Groups/destination are
+  hardcoded in `workflows/clone_repos.py`. Run `--dry-run` for a preview.
 
 ## Conventions
 
-- The `docs/` knowledge base is **Markdown** (per-project notes + ADRs), so it
-  reads as a cross-linked graph and stays diff-friendly, but it is **git-ignored**
-  (maintained locally per machine — it grows too large to commit). The tracked
-  Markdown is `README.md` and `CLAUDE.md`. Other generated outputs (e.g. digests)
-  are HTML written to `data/` (git-ignored).
-- **Secrets:** connector *auth* lives in the Claude app / MCP connectors, never
-  in this repo. `hub.config.yaml` holds only non-secret selectors and is
-  git-ignored.
-- **Connector availability:** MCP connectors are present in cloud routines but
-  may be absent in local runs. Schedule connector-only jobs as `cloud`.
+- The tracked Markdown is `README.md` and `CLAUDE.md`. The `wiki/` vault and
+  `workspace/` clones are git-ignored (maintained locally per machine).
+- **Secrets:** connector *auth* lives in the Claude app / MCP connectors, never in
+  this repo. `GITLAB_TOKEN` comes from the environment (see `.claude/hub-env`).
+- **Connector availability:** MCP connectors are present in cloud routines but may
+  be absent in local runs.
+  
+  
