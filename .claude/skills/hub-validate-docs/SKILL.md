@@ -1,5 +1,5 @@
 ---
-name: validate-docs
+name: hub-validate-docs
 description: Validate the curated docs/ vault — YAML front matter, internal links, required metadata, duplicate titles, generated-file markers, stale source paths, and the unresolved reconciliation queue. Use before committing docs or when checking vault health.
 ---
 
@@ -30,4 +30,4 @@ and relay the result.
 
 - Validation is read-only apart from the two `docs/memory/` snapshots.
 - Staleness is not failure: it flags docs whose `source_paths` vanished, which
-  usually means the doc needs re-verification via `/update-project-docs`.
+  usually means the doc needs re-verification via `/hub-update-project-docs`.

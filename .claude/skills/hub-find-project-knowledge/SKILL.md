@@ -1,5 +1,5 @@
 ---
-name: find-project-knowledge
+name: hub-find-project-knowledge
 description: Search the curated docs/ vault for existing knowledge before answering or documenting. Deterministic ranked retrieval over front matter + content, optionally refined by an agent. Use to check "what do we already know about X?" across the vault.
 ---
 
@@ -23,7 +23,7 @@ semantic.
    source-of-truth precedence in `CLAUDE.md`).
 
 3. **Report** the answer with the doc paths it came from. If the vault has no
-   good hit, say so — that gap is a candidate for `/ingest-repository` or a new note.
+   good hit, say so — that gap is a candidate for `/hub-ingest-repository` or a new note.
 
 ## Notes
 

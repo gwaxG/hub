@@ -1,6 +1,6 @@
 """Deterministic ranked search over the curated vault (stdlib only).
 
-Shared by the `/find-project-knowledge` workflow and the UserPromptSubmit hook
+Shared by the `/hub-find-project-knowledge` workflow and the UserPromptSubmit hook
 (per-prompt relevant-doc injection). Keyword-scored, title-weighted — it finds
 candidates; ranking meaning is left to an agent.
 """

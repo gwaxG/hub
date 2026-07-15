@@ -33,10 +33,10 @@ def main() -> int:
         return 0
     notes = []
     if errors:
-        notes.append(f"{len(errors)} doc validation issue(s) — run /validate-docs")
+        notes.append(f"{len(errors)} doc validation issue(s) — run /hub-validate-docs")
     if pending:
         notes.append(
-            f"{pending} unresolved doc-impact record(s) — run /update-project-docs"
+            f"{pending} unresolved doc-impact record(s) — run /hub-update-project-docs"
         )
     if notes:
         print("Docs: " + "; ".join(notes) + ".", file=sys.stderr)

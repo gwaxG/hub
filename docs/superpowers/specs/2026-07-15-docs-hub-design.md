@@ -78,7 +78,7 @@ source paths, complete|partial). `docs/memory/` holds `pending-updates.jsonl`,
 
 Buffer between cheap deterministic *detection* (PostToolUse appends a JSONL
 record on `workspace/` edits) and deliberate semantic *update*
-(`/update-project-docs` dedups, inspects the **final git diff**, maps source→doc
+(`/hub-update-project-docs` dedups, inspects the **final git diff**, maps source→doc
 via front-matter, classifies impact, regenerates `generated/`, updates curated
 docs only when behavior is established, validates, then removes resolved lines).
 The `Stop` hook surfaces a non-empty queue so drift is visible, never silent.
@@ -97,8 +97,8 @@ skill's Agent step.
 
 ## Skills (thin launchers)
 
-`/update-project-docs` `/validate-docs` `/ingest-repository` `/create-adr`
-`/refresh-project-graph` `/find-project-knowledge` — derive args → run workflow →
+`/hub-update-project-docs` `/hub-validate-docs` `/hub-ingest-repository` `/hub-create-adr`
+`/hub-refresh-project-graph` `/hub-find-project-knowledge` — derive args → run workflow →
 dispatch `Agent` for semantic work → summarize.
 
 ## Testing
@@ -113,4 +113,4 @@ classification, validation checks.
    `CLAUDE.md`, `README.md`.
 2. Hooks — 6 hooks + `settings.json`.
 3. Workflows + skills.
-4. Validation pass — `/validate-docs` on the empty-but-valid vault; hooks fire clean.
+4. Validation pass — `/hub-validate-docs` on the empty-but-valid vault; hooks fire clean.

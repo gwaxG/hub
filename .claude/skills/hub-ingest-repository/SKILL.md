@@ -1,5 +1,5 @@
 ---
-name: ingest-repository
+name: hub-ingest-repository
 description: Ingest a workspace repository into the curated docs/ vault — inventory it deterministically, then dispatch agents to extract graph nodes, architecture, domain, workflow and interface knowledge. Use to seed or refresh knowledge about a specific repo under workspace/.
 ---
 

@@ -4,7 +4,7 @@
 # ///
 """ingest_repository.py — deterministic inventory of a workspace repo.
 
-Owns the mechanical half of /ingest-repository: structure, languages, packages,
+Owns the mechanical half of /hub-ingest-repository: structure, languages, packages,
 frameworks and entrypoints. Writes docs/generated/inventory-<repo>.json and prints
 a summary the launching skill hands to Agent subagents for semantic analysis.
 

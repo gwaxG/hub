@@ -34,7 +34,7 @@ reconciliation queue (`docs/memory/pending-updates.jsonl`):
 
 - a PostToolUse hook appends one record when a `workspace/` file is edited
   (cheap, deterministic, no LLM);
-- `/update-project-docs` later dedups, inspects the **final** git diff, maps
+- `/hub-update-project-docs` later dedups, inspects the **final** git diff, maps
   source→doc, classifies impact, regenerates `docs/generated/`, updates curated
   docs **only when behavior is established**, validates, and clears resolved records.
 
@@ -57,7 +57,7 @@ Hooks detect + enforce; skills/agents reason; Python workflows own I/O.
   and `docs/memory/` stay machine-local (git-ignored) as reproducible bookkeeping.
 - Doc updates are deliberate and gated on established behavior, so the vault avoids
   documenting speculative work — at the cost of not being instantaneously current
-  until `/update-project-docs` runs.
+  until `/hub-update-project-docs` runs.
 - Requires the reconciliation discipline to actually be run; the `Stop` hook
   surfaces a non-empty queue so drift stays visible.
 

@@ -20,7 +20,7 @@ together what already exists** and adds only the missing glue:
 | Long-term memory (episodic) | `claude-mem` plugin (SQLite + local Chroma vectors) | nothing — already local |
 | Long-term memory (curated) | the `docs/` vault | the taxonomy, hooks and skills that maintain it |
 | Isolated work on repos | git worktrees + `superpowers:using-git-worktrees` | the workspace + worktree convention |
-| Mirroring the repos | GitLab API | the `/clone-repos` skill |
+| Mirroring the repos | GitLab API | the `/hub-clone-repos` skill |
 | Multi-agent orchestration | `superpowers` + `Agent` tool | thin skills over Python workflows |
 
 **No extra database.** `claude-mem` already runs SQLite+FTS5 for keyword search
@@ -81,7 +81,7 @@ from their `README.md`. Curated knowledge is never silently discarded.
 
 ## Working loop
 
-1. **Mirror the repos** — `/clone-repos` clones/updates every project under the
+1. **Mirror the repos** — `/hub-clone-repos` clones/updates every project under the
    configured `skillcorner` groups into `workspace/<group>/…/<repo>`. It skips any
    repo with uncommitted changes, so it's safe to re-run.
 2. **Work in a worktree** — to change a repo, create a git worktree + branch off
@@ -90,18 +90,18 @@ from their `README.md`. Curated knowledge is never silently discarded.
    `workspace/` clones fast-forwardable and isolates parallel work.
 3. **Keep docs in sync** — editing a `workspace/` file appends to the reconciliation
    queue (`docs/memory/pending-updates.jsonl`) via a PostToolUse hook; run
-   `/update-project-docs` to reconcile the queue against the final diff and update
+   `/hub-update-project-docs` to reconcile the queue against the final diff and update
    the vault. claude-mem captures the session automatically in parallel.
 
-Need `GITLAB_TOKEN` in the environment for `/clone-repos` (a `read_api` +
+Need `GITLAB_TOKEN` in the environment for `/hub-clone-repos` (a `read_api` +
 `read_repository` PAT). `.claude/hub-env` is a convenience shim.
 
 ---
 
 ## Skills
 
-`/clone-repos` · `/ingest-repository` · `/update-project-docs` · `/validate-docs`
-· `/create-adr` · `/refresh-project-graph` · `/find-project-knowledge`.
+`/hub-clone-repos` · `/hub-ingest-repository` · `/hub-update-project-docs` · `/hub-validate-docs`
+· `/hub-create-adr` · `/hub-refresh-project-graph` · `/hub-find-project-knowledge`.
 
 Each is a thin launcher: derive args → run a `workflows/` script for deterministic
 work → dispatch `Agent` subagents for semantic analysis → summarize. See

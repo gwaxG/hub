@@ -1,5 +1,5 @@
 ---
-name: refresh-project-graph
+name: hub-refresh-project-graph
 description: Regenerate docs/generated/graph.json from the hand-written nodes under docs/graph/ (front matter = node metadata, related = edges). Use after adding or editing graph nodes to rebuild the machine-readable project graph.
 ---
 

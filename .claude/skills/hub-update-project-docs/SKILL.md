@@ -1,5 +1,5 @@
 ---
-name: update-project-docs
+name: hub-update-project-docs
 description: Reconcile the documentation queue — consume docs/memory/pending-updates.jsonl, inspect the final git diff, update affected curated docs when behavior is established, then clear resolved entries. Use after doing real work in a workspace repo, or when the queue is non-empty.
 ---
 
@@ -30,7 +30,7 @@ writing the docs), dispatched to `Agent` subagents.
    right taxonomy folder when none exists. Set `source_paths`, add `related`
    links, and set `last_verified` to today **only because you inspected the
    source**. Never document speculative/unfinished work as current behavior. Use
-   `/create-adr` when the change reflects a real architectural decision.
+   `/hub-create-adr` when the change reflects a real architectural decision.
 
 4. **Validate:**
    ```bash

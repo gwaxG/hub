@@ -1,5 +1,5 @@
 ---
-name: create-adr
+name: hub-create-adr
 description: Create a numbered Architecture Decision Record under docs/architecture/decisions/. Use when a choice has meaningful alternatives or long-term consequences worth recording (context, decision, alternatives, consequences, status).
 ---
 

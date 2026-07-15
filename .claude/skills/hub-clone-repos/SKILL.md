@@ -1,5 +1,5 @@
 ---
-name: clone-repos
+name: hub-clone-repos
 description: Clone or update every GitLab project under the skillcorner groups (devops, data-engineering, applications, shared, software). Clones missing repos, pulls existing clean ones onto main, and skips any repo with uncommitted changes. Use when the user wants to sync/mirror all skillcorner repos locally.
 ---
 

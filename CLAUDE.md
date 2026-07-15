@@ -127,7 +127,7 @@ are decoupled by a queue:
 ```
 workspace/ edit
     → PostToolUse (track_doc_impact) appends a record to docs/memory/pending-updates.jsonl
-    → /update-project-docs dedups, inspects the FINAL git diff, maps source→doc,
+    → /hub-update-project-docs dedups, inspects the FINAL git diff, maps source→doc,
       classifies impact, regenerates docs/generated/, updates curated docs
       ONLY when behavior is established, validates
     → resolved records are removed
@@ -146,19 +146,19 @@ no LLM calls, no recursive doc rewrites.
 
 | Hook | Event | Role |
 |------|-------|------|
-| `session_start.py` | SessionStart | Inject **compact** context: doc policy, vault index, stale/unresolved warnings, and **workspace repos with no graph node yet** (suggest `/ingest-repository`). Never dump the vault; never duplicate `claude-mem`. |
+| `session_start.py` | SessionStart | Inject **compact** context: doc policy, vault index, stale/unresolved warnings, and **workspace repos with no graph node yet** (suggest `/hub-ingest-repository`). Never dump the vault; never duplicate `claude-mem`. |
 | `classify_prompt.py` | UserPromptSubmit | Deterministic keyword → task category + folder pointers, **and** a vault search over the prompt's terms injecting the top matching docs. No LLM. |
 | `protect_docs.py` | PreToolUse | Enforce hard rules: block edits to `docs/generated/`, direct writes into the `workspace/` mirror, unsafe git against a mirror, and reads of secrets. |
 | `track_doc_impact.py` | PostToolUse (Edit/Write) | Record edited `workspace/` paths into the reconciliation queue. No LLM, no doc rewrites. |
-| `on_merge_request.py` | PostToolUse (`create_merge_request`) | MR doc-gate: deterministically refresh the graph + source map, then inject a directive to run `/update-project-docs` and `/create-adr` *if the MR is a real decision*. |
+| `on_merge_request.py` | PostToolUse (`create_merge_request`) | MR doc-gate: deterministically refresh the graph + source map, then inject a directive to run `/hub-update-project-docs` and `/hub-create-adr` *if the MR is a real decision*. |
 | `validate_docs.py` | Stop | Cheap Markdown/metadata validation + unresolved-impact reminder. A `Stop` does not prove the feature is done. Avoid recursion. |
 | `session_end.py` | SessionEnd | Persist unresolved warnings, refresh cheap indexes, record undocumented source paths. No episodic duplication. |
 
-Some skills are **hook-prompted**: `session_start` suggests `/ingest-repository` for new repos, and `on_merge_request` prompts `/update-project-docs` (+ conditionally `/create-adr`). Hooks only *detect and suggest/refresh deterministically* — the agent work of each skill is still run by Claude, never by a hook.
+Some skills are **hook-prompted**: `session_start` suggests `/hub-ingest-repository` for new repos, and `on_merge_request` prompts `/hub-update-project-docs` (+ conditionally `/hub-create-adr`). Hooks only *detect and suggest/refresh deterministically* — the agent work of each skill is still run by Claude, never by a hook.
 
 ## Working on workspace repositories
 
-Repos are mirrored under `workspace/<group>/…/<repo>` by `/clone-repos`. The
+Repos are mirrored under `workspace/<group>/…/<repo>` by `/hub-clone-repos`. The
 mirror is a **pristine synchronization target** — do not do feature work in it.
 
 To modify a repo: create an isolated Git worktree + branch (`EnterWorktree` or
@@ -187,25 +187,25 @@ branch unless explicitly told to.
 
 ## Skills
 
-- **`/clone-repos`** — mirror every GitLab project under the configured
+- **`/hub-clone-repos`** — mirror every GitLab project under the configured
   `skillcorner` groups into `workspace/<group>/…/<repo>`. Clones missing repos,
   fast-forwards clean ones, skips dirty ones. Reads `GITLAB_TOKEN` from the
   environment (`read_api` + `read_repository`); never stores it. `--dry-run` previews.
-- **`/ingest-repository`** — inventory a repo deterministically, dispatch agents to
+- **`/hub-ingest-repository`** — inventory a repo deterministically, dispatch agents to
   analyze meaningful components, create/update graph nodes and knowledge, record
   source paths + verification metadata. Skip trivial modules.
-- **`/update-project-docs`** — consume the reconciliation queue: dedup, inspect the
+- **`/hub-update-project-docs`** — consume the reconciliation queue: dedup, inspect the
   git diff, resolve affected docs, classify impact, regenerate `generated/`, update
   curated docs when behavior is established, create/update an ADR when required,
   validate, then remove resolved queue entries.
-- **`/validate-docs`** — front-matter, internal links, generated-file markers,
+- **`/hub-validate-docs`** — front-matter, internal links, generated-file markers,
   source-path existence, duplicates, required metadata, stale/deprecated reporting,
   unresolved-queue summary.
-- **`/create-adr`** — stamp a numbered ADR (context, decision, alternatives,
+- **`/hub-create-adr`** — stamp a numbered ADR (context, decision, alternatives,
   consequences, status) from the template.
-- **`/refresh-project-graph`** — regenerate the machine graph index from `graph/`
+- **`/hub-refresh-project-graph`** — regenerate the machine graph index from `graph/`
   node front-matter.
-- **`/find-project-knowledge`** — deterministic search across the vault
+- **`/hub-find-project-knowledge`** — deterministic search across the vault
   (content + front-matter), optionally ranked by an agent.
 
 ## Source of truth

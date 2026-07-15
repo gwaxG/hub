@@ -3,7 +3,7 @@
 
 Cheap and deterministic: when a workspace/ file is edited, append one record to
 docs/memory/pending-updates.jsonl (with candidate docs if a source map exists).
-No LLM, no doc rewrites — the semantic update happens later in /update-project-docs.
+No LLM, no doc rewrites — the semantic update happens later in /hub-update-project-docs.
 """
 
 from __future__ import annotations

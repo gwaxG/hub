@@ -2,7 +2,7 @@
 
 The buffer between cheap deterministic *detection* (a PostToolUse hook appends a
 record when a ``workspace/`` file is edited) and deliberate semantic *update*
-(the ``/update-project-docs`` skill consumes, reconciles, then resolves).
+(the ``/hub-update-project-docs`` skill consumes, reconciles, then resolves).
 
 Append-only JSONL: crash-safe, greppable, trivial for a fast hook to produce.
 Malformed lines are skipped rather than fatal.

@@ -34,7 +34,7 @@ def _new_repo_line() -> str | None:
     shown = ", ".join(new[:15]) + (f" (+{len(new) - 15} more)" if len(new) > 15 else "")
     return (
         f"🆕 {len(new)} workspace repo(s) with no graph node yet: {shown}. "
-        "Run /ingest-repository <path> to add them to the vault."
+        "Run /hub-ingest-repository <path> to add them to the vault."
     )
 
 
@@ -57,7 +57,7 @@ def build_context() -> str:
     ]
     if pending:
         lines.append(
-            f"⚠ {pending} unresolved doc-impact record(s) in the queue — run /update-project-docs."
+            f"⚠ {pending} unresolved doc-impact record(s) in the queue — run /hub-update-project-docs."
         )
     if stale:
         lines.append(

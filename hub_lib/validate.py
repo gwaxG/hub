@@ -1,6 +1,6 @@
 """Pure validation predicates for curated docs (stdlib only).
 
-Shared by the cheap ``Stop``-hook check and the full ``/validate-docs`` workflow.
+Shared by the cheap ``Stop``-hook check and the full ``/hub-validate-docs`` workflow.
 Every function is side-effect free and returns a list of human-readable errors
 (empty == valid), so callers can aggregate and report.
 """
@@ -78,7 +78,7 @@ def scan_docs(hub_root: Path | str) -> list[str]:
     """Cheap front-matter + internal-link check over every curated doc.
 
     Returns ``"<relpath>: <error>"`` strings. Used by the Stop hook and the full
-    /validate-docs workflow (which layers extra checks on top).
+    /hub-validate-docs workflow (which layers extra checks on top).
     """
     from hub_lib import frontmatter, paths
 

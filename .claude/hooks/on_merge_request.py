@@ -26,10 +26,10 @@ def build_context() -> str:
         [
             "Merge request opened — documentation gate:",
             "  1. Project graph + source map were refreshed automatically.",
-            f"  2. Run /update-project-docs to reconcile the vault against this MR's diff "
+            f"  2. Run /hub-update-project-docs to reconcile the vault against this MR's diff "
             f"before it merges ({pending} record(s) currently queued).",
             "  3. If this MR embodies an architectural decision (real alternatives / "
-            "lasting consequences), run /create-adr — otherwise skip it.",
+            "lasting consequences), run /hub-create-adr — otherwise skip it.",
         ]
     )
 
