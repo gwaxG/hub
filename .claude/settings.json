@@ -28,6 +28,12 @@
         "hooks": [
           { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/track_doc_impact.py\"" }
         ]
+      },
+      {
+        "matcher": "create_merge_request",
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/on_merge_request.py\"" }
+        ]
       }
     ],
     "Stop": [

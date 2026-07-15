@@ -146,12 +146,15 @@ no LLM calls, no recursive doc rewrites.
 
 | Hook | Event | Role |
 |------|-------|------|
-| `session_start.py` | SessionStart | Inject **compact** authoritative context: doc policy, vault index, stale-doc warnings, unresolved-queue count. Never dump the vault; never duplicate `claude-mem`. |
-| `classify_prompt.py` | UserPromptSubmit | Deterministic keyword → task category; point at relevant `docs/` folders. No repo-wide LLM analysis. |
+| `session_start.py` | SessionStart | Inject **compact** context: doc policy, vault index, stale/unresolved warnings, and **workspace repos with no graph node yet** (suggest `/ingest-repository`). Never dump the vault; never duplicate `claude-mem`. |
+| `classify_prompt.py` | UserPromptSubmit | Deterministic keyword → task category + folder pointers, **and** a vault search over the prompt's terms injecting the top matching docs. No LLM. |
 | `protect_docs.py` | PreToolUse | Enforce hard rules: block edits to `docs/generated/`, direct writes into the `workspace/` mirror, unsafe git against a mirror, and reads of secrets. |
-| `track_doc_impact.py` | PostToolUse | Record edited `workspace/` paths into the reconciliation queue. No LLM, no doc rewrites. |
+| `track_doc_impact.py` | PostToolUse (Edit/Write) | Record edited `workspace/` paths into the reconciliation queue. No LLM, no doc rewrites. |
+| `on_merge_request.py` | PostToolUse (`create_merge_request`) | MR doc-gate: deterministically refresh the graph + source map, then inject a directive to run `/update-project-docs` and `/create-adr` *if the MR is a real decision*. |
 | `validate_docs.py` | Stop | Cheap Markdown/metadata validation + unresolved-impact reminder. A `Stop` does not prove the feature is done. Avoid recursion. |
 | `session_end.py` | SessionEnd | Persist unresolved warnings, refresh cheap indexes, record undocumented source paths. No episodic duplication. |
+
+Some skills are **hook-prompted**: `session_start` suggests `/ingest-repository` for new repos, and `on_merge_request` prompts `/update-project-docs` (+ conditionally `/create-adr`). Hooks only *detect and suggest/refresh deterministically* — the agent work of each skill is still run by Claude, never by a hook.
 
 ## Working on workspace repositories
 
@@ -160,7 +163,7 @@ mirror is a **pristine synchronization target** — do not do feature work in it
 
 To modify a repo: create an isolated Git worktree + branch (`EnterWorktree` or
 `superpowers:using-git-worktrees`), make changes there, run tests/linters, inspect
-the final diff, reconcile affected docs, then open an MR / merge, and remove the
+the final diff, reconcile affected docs, then open an MR, wait for merging, and remove the
 worktree. This keeps `workspace/` clones fast-forwardable and isolates parallel work.
 
 Do **not** commit feature changes from a mirror, leave untracked generated files in
@@ -170,7 +173,7 @@ branch unless explicitly told to.
 ## Folders
 
 - **`hub_lib/`** — stdlib-only shared logic (queue, front-matter, paths, classify,
-  validate). Imported by hooks, workflows and tests.
+  validate, search, generate). Imported by hooks, workflows and tests.
 - **`workflows/`** — substantial committed Python; all inputs via args/env.
 - **`.claude/skills/`** — thin launchers (orchestrate workflows + `Agent`).
 - **`.claude/hooks/`** — committed stdlib-only hook scripts.

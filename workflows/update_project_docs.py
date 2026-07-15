@@ -21,9 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import refresh_graph  # noqa: E402  (sibling workflow)
-import source_map  # noqa: E402
-from hub_lib import paths, queue  # noqa: E402
+from hub_lib import generate, paths, queue  # noqa: E402
 
 _IMPACT_RULES = [
     ("no_documentation_impact", ("/test", "test_", "_test.", "/tests/")),
@@ -49,9 +47,9 @@ def classify_impact(source_path: str) -> str:
     return "curated_documentation"
 
 
-def regenerate_indexes() -> None:
-    source_map.main()
-    refresh_graph.main()
+def regenerate_indexes(hub_root: Path) -> None:
+    generate.build_source_map(hub_root)
+    generate.build_graph(hub_root)
 
 
 def build_plan(hub_root: Path) -> list[dict]:
@@ -118,7 +116,7 @@ def main() -> int:
         print(f"resolved {removed} queue record(s).")
         return 0
 
-    regenerate_indexes()
+    regenerate_indexes(hub_root)
     print_plan(build_plan(hub_root))
     return 0
 

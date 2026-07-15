@@ -4,9 +4,8 @@
 # ///
 """find_knowledge.py — deterministic ranked search across the curated vault.
 
-Scores each curated doc by query-term hits (title weighted heavily) and prints
-the best matches with a snippet. An agent can rank the shortlist semantically
-afterwards; this owns the deterministic retrieval.
+Thin CLI over ``hub_lib.search`` (shared with the UserPromptSubmit hook). An
+agent can rank the shortlist semantically afterwards.
 
     uv run workflows/find_knowledge.py match state machine [--type workflow] [--limit 10]
 """
@@ -18,37 +17,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from hub_lib import frontmatter, paths  # noqa: E402
-
-_TITLE_WEIGHT = 5
-
-
-def score(terms: list[str], title: str, body: str) -> int:
-    title_l, body_l = title.lower(), body.lower()
-    return sum(_TITLE_WEIGHT * title_l.count(t) + body_l.count(t) for t in terms)
-
-
-def snippet(terms: list[str], body: str) -> str:
-    for line in body.splitlines():
-        low = line.lower()
-        if any(t in low for t in terms) and line.strip():
-            return line.strip()[:120]
-    return ""
-
-
-def search(hub_root: Path, terms: list[str], type_filter: str | None):
-    results = []
-    for doc in paths.iter_curated_docs(hub_root):
-        meta, body = frontmatter.load(doc)
-        if type_filter and meta.get("type") != type_filter:
-            continue
-        title = meta.get("title", doc.stem)
-        s = score(terms, title, body)
-        if s:
-            results.append(
-                (s, doc.relative_to(hub_root).as_posix(), title, snippet(terms, body))
-            )
-    return sorted(results, reverse=True)
+from hub_lib import paths, search  # noqa: E402
 
 
 def main() -> int:
@@ -60,12 +29,12 @@ def main() -> int:
 
     hub_root = paths.find_hub_root(Path.cwd())
     terms = [t.lower() for t in args.query]
-    results = search(hub_root, terms, args.type)
+    results = search.search(hub_root, terms, args.type, args.limit)
 
     if not results:
         print(f"no matches for {' '.join(args.query)!r}")
         return 0
-    for s, rel, title, snip in results[: args.limit]:
+    for s, rel, title, snip in results:
         print(f"[{s:>3}] {rel} — {title}")
         if snip:
             print(f"       {snip}")

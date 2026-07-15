@@ -6,6 +6,7 @@ functions over ``pathlib.Path`` — no side effects, no third-party deps.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # Marker files/dirs that only exist at the hub root.
@@ -64,6 +65,38 @@ def is_generated_doc(path: Path | str, hub_root: Path) -> bool:
 def is_worktree_path(path: Path | str) -> bool:
     """True if *path* is inside a git worktree checkout (feature work is allowed)."""
     return ".claude/worktrees/" in Path(path).as_posix()
+
+
+def iter_workspace_repos(hub_root: Path):
+    """Yield each mirrored repo root under ``workspace/`` (dirs holding a .git).
+
+    Does not descend into a repo once found, and skips nested worktree checkouts
+    under ``.claude/worktrees/``.
+    """
+    ws = workspace_dir(hub_root)
+    if not ws.exists():
+        return
+    for root, dirs, files in os.walk(ws):
+        if ".claude/worktrees/" in Path(root).as_posix():
+            dirs[:] = []
+            continue
+        if ".git" in dirs or ".git" in files:
+            yield Path(root)
+            dirs[:] = []  # a repo is a leaf for our purposes
+
+
+def graph_node_for_repo(hub_root: Path, repo_name: str) -> Path:
+    """The canonical graph node path for a repo (may not exist yet)."""
+    return docs_dir(hub_root) / "graph" / "repositories" / f"{repo_name}.md"
+
+
+def un_ingested_repos(hub_root: Path) -> list[str]:
+    """Names of workspace repos that have no graph node yet."""
+    return sorted(
+        repo.name
+        for repo in iter_workspace_repos(hub_root)
+        if not graph_node_for_repo(hub_root, repo.name).exists()
+    )
 
 
 def iter_curated_docs(hub_root: Path):

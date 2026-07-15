@@ -25,6 +25,19 @@ def _stale_count() -> int:
         return 0
 
 
+def _new_repo_line() -> str | None:
+    from hub_lib import paths
+
+    new = paths.un_ingested_repos(HUB_ROOT)
+    if not new:
+        return None
+    shown = ", ".join(new[:15]) + (f" (+{len(new) - 15} more)" if len(new) > 15 else "")
+    return (
+        f"🆕 {len(new)} workspace repo(s) with no graph node yet: {shown}. "
+        "Run /ingest-repository <path> to add them to the vault."
+    )
+
+
 def build_context() -> str:
     from hub_lib import paths, queue
 
@@ -50,6 +63,9 @@ def build_context() -> str:
         lines.append(
             f"⚠ {stale} doc(s) flagged stale — see docs/memory/stale-docs.json."
         )
+    new_repos = _new_repo_line()
+    if new_repos:
+        lines.append(new_repos)
     return "\n".join(lines)
 
 
