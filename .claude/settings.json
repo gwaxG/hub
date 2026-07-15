@@ -1,1 +1,48 @@
-{}
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start.py\"" }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/classify_prompt.py\"" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect_docs.py\"" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/track_doc_impact.py\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/validate_docs.py\"" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "uv run --no-project \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_end.py\"" }
+        ]
+      }
+    ]
+  }
+}

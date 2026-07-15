@@ -3,7 +3,7 @@
 A **project-agnostic** home for driving Claude Code as a personal engineering
 assistant. Its job: **observe a set of workspace repos and do real development in
 them via on-demand git worktrees, backed by long-term memory** — built almost
-entirely from Claude Code plugins rather than a bespoke backend service.
+entirely from Claude Code plugins and hooks rather than a bespoke backend service.
 
 Nothing in this repo is tied to a particular company or project.
 
@@ -18,14 +18,13 @@ together what already exists** and adds only the missing glue:
 | Need | What provides it | This hub adds |
 |------|------------------|---------------|
 | Long-term memory (episodic) | `claude-mem` plugin (SQLite + local Chroma vectors) | nothing — already local |
-| Long-term memory (curated) | `claude-obsidian` plugin | the `wiki/` architecture vault |
+| Long-term memory (curated) | the `docs/` vault | the taxonomy, hooks and skills that maintain it |
 | Isolated work on repos | git worktrees + `superpowers:using-git-worktrees` | the workspace + worktree convention |
 | Mirroring the repos | GitLab API | the `/clone-repos` skill |
-| Multi-agent orchestration | `superpowers` + `Agent`/`Workflow` tools | saved workflow scripts |
+| Multi-agent orchestration | `superpowers` + `Agent` tool | thin skills over Python workflows |
 
 **No extra database.** `claude-mem` already runs SQLite+FTS5 for keyword search
-*and* a local ChromaDB for semantic vectors. (If Chroma's RAM use bites, switch
-`claude-mem` to SQLite-only mode.)
+*and* a local ChromaDB for semantic vectors.
 
 ---
 
@@ -34,17 +33,25 @@ together what already exists** and adds only the missing glue:
 ```
 hub/
 ├── README.md          # this file
-├── CLAUDE.md          # how the pieces connect
-├── wiki/              # curated long-term-memory vault (Obsidian, git-ignored)
+├── CLAUDE.md          # how the pieces connect (read this)
+├── pyproject.toml     # shared deps + test env; makes hub_lib importable
+├── hub_lib/           # stdlib-only shared logic (queue, frontmatter, paths, classify, validate)
+├── docs/              # curated Layer-2 memory vault (tracked; see git policy below)
+├── workflows/         # full uv-run Python scripts (no JS)
+├── tests/             # pytest over hub_lib
+├── .claude/
+│   ├── settings.json  # wires the doc-sync hooks
+│   ├── hooks/         # stdlib-only Python hooks
+│   └── skills/        # thin launchers
 ├── workspace/         # mirrored repo clones (git-ignored)
-├── workflows/         # full scripts: uv-run Python (no JS)
-├── .claude/skills/    # thin launchers (/clone-repos)
 ├── config/            # hub.config.yaml (git-ignored, currently vestigial)
 ├── data/              # generated outputs (git-ignored)
 └── playground/        # disposable/random scripts (git-ignored)
 ```
 
-All scripting is **Python via `uv`** (inline PEP 723 deps — no venv, no JS).
+All scripting is **Python via `uv`**. Workflows use the root `pyproject`
+environment (and may carry PEP 723 headers for portability); hooks are
+stdlib-only and run via `uv run --no-project`. **No JavaScript.**
 
 ---
 
@@ -54,14 +61,21 @@ Two systems, clear division of labor — don't duplicate between them:
 
 - **`claude-mem` = automatic "what I did."** Captures observations every session
   and injects relevant context at the next `SessionStart`. Zero effort. Backed
-  locally by SQLite (keyword) + Chroma (semantic).
-- **`wiki/` = curated "what the code is and why."** A self-contained Obsidian
-  vault (Mode B: codebase / architecture map) that you and Claude maintain via the
-  `claude-obsidian` plugin — `ingest` a source, `query` it, `lint` it. Plain
-  Markdown you can read in any editor; structure and conventions live in
-  `wiki/CLAUDE.md`.
+  locally by SQLite (keyword) + Chroma (semantic). Historical, **not** authoritative.
+- **`docs/` = curated "what the code is and why."** A tracked, plain-Markdown vault
+  with a fixed taxonomy (graph, architecture/decisions, domain, workflows, runbooks,
+  interfaces, operations, development, generated, memory) and YAML front matter,
+  maintained by hub hooks, workflows and skills. Authoritative for current project
+  knowledge.
 
-claude-mem records *what happened*; the wiki records *what the code is*.
+`claude-mem` records *what happened*; `docs/` records *what the code is*.
+
+### `docs/` git policy
+
+`docs/` **is tracked** in git so curated knowledge is shared, backed up and
+reviewable — **except** `docs/generated/**` (mechanically regenerated) and
+`docs/memory/**` (machine-local sync bookkeeping), which are git-ignored aside
+from their `README.md`. Curated knowledge is never silently discarded.
 
 ---
 
@@ -74,18 +88,30 @@ claude-mem records *what happened*; the wiki records *what the code is*.
    its clone (`EnterWorktree` or `superpowers:using-git-worktrees`). Make changes,
    test, open an MR / merge, then remove the worktree. This keeps the pristine
    `workspace/` clones fast-forwardable and isolates parallel work.
-3. **Remember what matters** — claude-mem captures the session automatically;
-   when you learn something durable about a codebase, ingest/update the `wiki/`.
+3. **Keep docs in sync** — editing a `workspace/` file appends to the reconciliation
+   queue (`docs/memory/pending-updates.jsonl`) via a PostToolUse hook; run
+   `/update-project-docs` to reconcile the queue against the final diff and update
+   the vault. claude-mem captures the session automatically in parallel.
 
 Need `GITLAB_TOKEN` in the environment for `/clone-repos` (a `read_api` +
-`read_repository` PAT). `.claude/hub-env` is a convenience shim that pulls it
-from your shell profile.
+`read_repository` PAT). `.claude/hub-env` is a convenience shim.
 
 ---
 
-## Multi-agent work
+## Skills
 
-- **Ad-hoc parallel work:** the `Agent` tool with a fitting subagent type
-  (`Explore`, `Plan`, `code-reviewer`, …).
-- **Repeatable fan-out:** `Workflow` scripts in `workflows/`.
-- **Isolation:** use git worktrees when several agents edit files in parallel.
+`/clone-repos` · `/ingest-repository` · `/update-project-docs` · `/validate-docs`
+· `/create-adr` · `/refresh-project-graph` · `/find-project-knowledge`.
+
+Each is a thin launcher: derive args → run a `workflows/` script for deterministic
+work → dispatch `Agent` subagents for semantic analysis → summarize. See
+`CLAUDE.md` for the full contract of each.
+
+---
+
+## Development
+
+```bash
+uv run --dev pytest                  # test hub_lib
+uv run workflows/scaffold_docs.py    # (re)build the docs/ vault skeleton
+```

@@ -42,7 +42,9 @@ GROUPS = [
     "skillcorner/shared",
     "skillcorner/software",
 ]
-DEST_DIR = Path(__file__).resolve().parent.parent / "workspace"  # inside the hub; never write outside it
+DEST_DIR = (
+    Path(__file__).resolve().parent.parent / "workspace"
+)  # inside the hub; never write outside it
 PREFERRED_BRANCH = "main"  # checked out on update when it exists; else repo default
 SKIP_ARCHIVED = True
 
@@ -91,28 +93,37 @@ def auth_args(token: str) -> list[str]:
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
-    proc = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, timeout=600
-    )
+    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=600)
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
 
 
 def is_dirty(repo: Path) -> bool:
     """True if the working tree has staged or unstaged changes (untracked files
     are ignored — they don't block a pull)."""
-    rc, out, _ = run(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"])
+    rc, out, _ = run(
+        ["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=no"]
+    )
     return rc != 0 or bool(out)
 
 
 def target_branch(repo: Path, default_branch: str) -> str:
     """Prefer PREFERRED_BRANCH when it exists on origin, else the repo default."""
     rc, _, _ = run(
-        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet",
-         f"refs/remotes/origin/{PREFERRED_BRANCH}"]
+        [
+            "git",
+            "-C",
+            str(repo),
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            f"refs/remotes/origin/{PREFERRED_BRANCH}",
+        ]
     )
     if rc == 0:
         return PREFERRED_BRANCH
-    rc, out, _ = run(["git", "-C", str(repo), "symbolic-ref", "refs/remotes/origin/HEAD"])
+    rc, out, _ = run(
+        ["git", "-C", str(repo), "symbolic-ref", "refs/remotes/origin/HEAD"]
+    )
     if rc == 0 and out:
         return out.rsplit("/", 1)[-1]
     return default_branch or PREFERRED_BRANCH
@@ -121,7 +132,9 @@ def target_branch(repo: Path, default_branch: str) -> str:
 # ---------------------------------------------------------------------------
 # Per-project handling
 # ---------------------------------------------------------------------------
-def handle_project(project: dict, dest_root: Path, token: str, dry_run: bool) -> tuple[str, str]:
+def handle_project(
+    project: dict, dest_root: Path, token: str, dry_run: bool
+) -> tuple[str, str]:
     """Clone or update one project. Returns (category, message)."""
     ns_path = project["path_with_namespace"]  # e.g. skillcorner/devops/foo
     clean_url = project["http_url_to_repo"]
@@ -130,13 +143,19 @@ def handle_project(project: dict, dest_root: Path, token: str, dry_run: bool) ->
 
     if not (local / ".git").exists():
         if local.exists() and any(local.iterdir()):
-            return "error", f"{ns_path}: destination exists but is not a git repo — skipped"
+            return (
+                "error",
+                f"{ns_path}: destination exists but is not a git repo — skipped",
+            )
         if dry_run:
             return "cloned", f"{ns_path}: would clone -> {local}"
         local.parent.mkdir(parents=True, exist_ok=True)
         rc, _, err = run(["git", *auth_args(token), "clone", clean_url, str(local)])
         if rc != 0:
-            return "error", f"{ns_path}: clone failed — {err.splitlines()[-1] if err else 'unknown'}"
+            return (
+                "error",
+                f"{ns_path}: clone failed — {err.splitlines()[-1] if err else 'unknown'}",
+            )
         branch = target_branch(local, default_branch)
         run(["git", "-C", str(local), "checkout", branch])
         return "cloned", f"{ns_path}: cloned ({branch})"
@@ -149,26 +168,42 @@ def handle_project(project: dict, dest_root: Path, token: str, dry_run: bool) ->
 
     rc, _, err = run(["git", *auth_args(token), "-C", str(local), "fetch", "--prune"])
     if rc != 0:
-        return "error", f"{ns_path}: fetch failed — {err.splitlines()[-1] if err else 'unknown'}"
+        return (
+            "error",
+            f"{ns_path}: fetch failed — {err.splitlines()[-1] if err else 'unknown'}",
+        )
     branch = target_branch(local, default_branch)
     rc, _, err = run(["git", "-C", str(local), "checkout", branch])
     if rc != 0:
-        return "error", f"{ns_path}: checkout {branch} failed — {err.splitlines()[-1] if err else 'unknown'}"
+        return (
+            "error",
+            f"{ns_path}: checkout {branch} failed — {err.splitlines()[-1] if err else 'unknown'}",
+        )
     rc, _, err = run(["git", *auth_args(token), "-C", str(local), "pull", "--ff-only"])
     if rc != 0:
-        return "error", f"{ns_path}: pull failed ({branch}) — {err.splitlines()[-1] if err else 'unknown'}"
+        return (
+            "error",
+            f"{ns_path}: pull failed ({branch}) — {err.splitlines()[-1] if err else 'unknown'}",
+        )
     return "updated", f"{ns_path}: updated ({branch})"
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dest", type=Path, default=DEST_DIR, help=f"clone root (default {DEST_DIR})")
-    parser.add_argument("--dry-run", action="store_true", help="report actions without touching disk")
+    parser.add_argument(
+        "--dest", type=Path, default=DEST_DIR, help=f"clone root (default {DEST_DIR})"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="report actions without touching disk"
+    )
     args = parser.parse_args(argv)
 
     token = os.environ.get("GITLAB_TOKEN")
     if not token:
-        print("ERROR: set GITLAB_TOKEN in the environment (a GitLab PAT with read_api + read_repository).", file=sys.stderr)
+        print(
+            "ERROR: set GITLAB_TOKEN in the environment (a GitLab PAT with read_api + read_repository).",
+            file=sys.stderr,
+        )
         return 2
 
     dest_root = args.dest.expanduser().resolve()
@@ -192,7 +227,12 @@ def main(argv: list[str]) -> int:
     projects = sorted(seen.values(), key=lambda p: p["path_with_namespace"])
     print(f"\nTotal unique projects: {len(projects)}\n")
 
-    buckets: dict[str, list[str]] = {"cloned": [], "updated": [], "skipped": [], "error": []}
+    buckets: dict[str, list[str]] = {
+        "cloned": [],
+        "updated": [],
+        "skipped": [],
+        "error": [],
+    }
     total = len(projects)
     width = len(str(total))
     for i, p in enumerate(projects, 1):

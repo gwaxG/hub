@@ -1,86 +1,237 @@
 # CLAUDE.md — Claude Ops Hub
 
-This repo is a **project-agnostic control layer for Claude Code**, not an app.
-It wires together capabilities Claude Code already ships (claude-mem, MCP
-connectors, the `Agent` tool, git worktrees) and adds only the glue.
-Read `README.md` for the full rationale.
+This repository is a **project-agnostic control layer for Claude Code**, not an
+application. It coordinates capabilities Claude Code already provides —
+`claude-mem`, MCP connectors, the `Agent` tool, hooks, skills, and Git worktrees
+— and adds only the deterministic glue needed to use them consistently across
+many repositories. Read `README.md` for the full rationale.
 
-Its job today: **observe the workspace repos and do real work in them via
-on-demand git worktrees, backed by long-term memory.**
+Three primary responsibilities:
 
-## Language
+1. Mirror and inspect workspace repositories.
+2. Perform real work in isolated, on-demand Git worktrees.
+3. Maintain durable project knowledge through complementary automatic
+   (`claude-mem`) and curated (`docs/`) memory.
 
-**All scripting is Python, run via `uv`** (`uv run ...`), with dependencies
-declared inline via PEP 723 headers — no venv, no `pyproject.toml`, no committed
-Python package. **No JavaScript.** LLM fan-out (analyzing many repos, etc.) is
-done by dispatching the **Agent tool** from the launching skill, while the
-committed Python script owns the deterministic work (discovery, file I/O).
+## Language and runtime
+
+All committed automation is Python, executed through `uv`.
+
+- **Shared dependencies + the test env** live in the root `pyproject.toml`.
+  `uv run …` / `uv sync` give every workflow and the test suite a consistent
+  environment, and `hub_lib/` is a normal importable module.
+- **Workflows** (`workflows/`) use that project env and may *additionally* carry
+  a PEP 723 header for standalone portability.
+- **Hooks** (`.claude/hooks/`) are **stdlib-only** and run via
+  `uv run --no-project`, so they never pay dependency-resolution cost. They reach
+  `hub_lib` through a one-line `sys.path` insert.
+- **No JavaScript or TypeScript automation.**
+
+Deterministic work belongs in Python — repository discovery, Git operations,
+file traversal, metadata extraction, indexing, validation, queue management, I/O.
+LLM-based semantic analysis belongs in `Agent` subagents dispatched by a skill.
+**Do not ask an LLM to do work Python can do reliably.**
 
 ## Where code goes
 
-- **One-liner → a skill.** A short inline snippet goes directly in the skill as a
-  `uv run --with … python - <<'PY' …` block.
-- **More than a one-liner → `workflows/`.** Anything substantial is a committed
-  **Python** script under `workflows/` (`uv run`). Skills stay thin: they run the
-  Python script for deterministic work and dispatch Agent subagents for LLM work.
+- **Small inline op** → a `uv run … python - <<'PY'` block directly in a skill,
+  only when short, self-contained, and clearer inline.
+- **Substantial deterministic op** → a committed script in `workflows/`. Workflows
+  take all variable input via CLI args or env vars, use explicit exit codes, write
+  deterministic outputs, avoid interactive prompts, are safe to re-run, and own the
+  substantive implementation.
+- **Shared pure logic** → `hub_lib/` (stdlib-only, imported by hooks, workflows and
+  tests). This is where DRY lives; do not copy queue/path/front-matter logic around.
 
-## Memory: two layers, no overlap
+Skills stay **thin**: collect args → invoke a workflow → dispatch `Agent`
+subagents for semantic work → summarize. A skill must not duplicate workflow logic.
 
-- **claude-mem** = automatic "what I did." Captured every session, re-injected
-  at `SessionStart`. Zero effort. Local SQLite + Chroma. It provides its own
-  session-start context injection — the hub adds no memory hooks of its own.
-- **`wiki/`** = curated "what the code is and why." A self-contained **Obsidian
-  vault** (Mode B: codebase / architecture map) at `~/dev/hub/wiki/`, maintained
-  by you and Claude via the `claude-obsidian` plugin (`ingest`, `query`, `lint`).
-  It is **git-ignored** (machine-local). Structure and conventions live in
-  `wiki/CLAUDE.md`. claude-mem records *what happened*; the wiki records *what the
-  code is*.
+## Memory model
 
-Keep the wiki current as you learn something durable about a codebase — ingest a
-source or update the relevant note. Capture the non-obvious and the *why*; skip
-routine edits and plain restatements of the code.
+Two complementary layers. Keep them distinct; never duplicate between them.
 
-## Working on workspace repos: git worktrees
+### Layer 1: `claude-mem` — automatic episodic memory
 
-Repos are mirrored under `workspace/<group>/…/<repo>` by `/clone-repos`. To work
-on one, **do it in a git worktree**, not on the clone's main checkout:
+*What happened* during previous sessions (tasks attempted, files edited, commands
+run, errors, conclusions, what's unfinished). Zero effort, local SQLite + Chroma,
+own `SessionStart` injection. **The hub adds no second session-history hook.**
+It is historical context, **not authoritative** — never treat a past-session
+observation as current truth without checking code or `docs/`.
 
-- Use the built-in worktree support (`EnterWorktree`) or the
-  `superpowers:using-git-worktrees` skill to create an isolated worktree + branch
-  off the target repo.
-- Make changes there, run tests, then open an MR / merge, and remove the worktree
-  when done.
-- This keeps the pristine `workspace/` clones clean (so `/clone-repos` can always
-  fast-forward them) and isolates parallel work.
+### Layer 2: `docs/` — curated semantic & procedural memory
+
+*What the systems are, how they work, and why.* Durable knowledge extracted from
+the workspace repos, maintained through workflows, hooks and skills. Authoritative
+for current structure, architecture, domain rules, interfaces, workflows and
+operations. Describe the **current system**, not the chronology of sessions.
+
+**Capture:** non-obvious behavior, architectural intent, domain concepts and
+invariants, cross-service relationships, key workflows, interface contracts,
+operational knowledge, reasons behind durable decisions.
+
+**Do not capture:** routine edits, temporary debugging notes, raw transcripts,
+unimplemented speculation, plain restatements of functions, or anything clearer in
+generated API/schema docs.
+
+## `docs/` structure
+
+```
+docs/
+├── README.md            # vault index + git policy
+├── graph/               # repos, services, packages, databases, external systems (+ relationships)
+├── architecture/
+│   └── decisions/       # ADRs
+├── domain/              # terminology, entities, rules, invariants, state machines
+├── workflows/           # normal end-to-end system workflows
+├── runbooks/            # diagnosis & recovery for abnormal situations
+├── interfaces/          # API/event/queue/schema contracts, compatibility
+├── operations/          # environments, deploy, observability, ownership, SLOs
+├── development/         # local setup, testing, migrations, conventions
+├── generated/           # mechanically derived — DO NOT hand-edit
+└── memory/              # sync bookkeeping (queue, stale-docs, last-validation)
+```
+
+- A **workflow** describes expected behavior; a **runbook** describes recovery.
+  Do not mix them.
+- **`generated/`** files are regenerated by workflows and carry a banner
+  (`<!-- generated: <workflow> … -->`) naming the workflow, UTC timestamp, source
+  paths and complete|partial. Never edit them by hand.
+- **`memory/`** is bookkeeping for hooks and doc workflows, not documentation.
+
+### Documentation metadata
+
+Curated docs use YAML front matter:
+
+```yaml
+title: string
+type: graph | architecture | decision | domain | workflow | runbook | interface | operations | development
+status: draft | current | deprecated
+owners: list[string]
+systems: list[string]
+source_paths: list[string]
+related: list[path]
+last_verified: YYYY-MM-DD
+generated: true | false
+```
+
+Use it for discovery, source→doc mapping, staleness detection, ownership,
+validation and targeted context injection. **Do not update `last_verified` unless
+the source was actually inspected.**
+
+## Documentation synchronization: the reconciliation queue
+
+Hooks must **not** blindly rewrite docs after every code edit — an edit may be
+incomplete, experimental, reverted or behavior-preserving. Detection and update
+are decoupled by a queue:
+
+```
+workspace/ edit
+    → PostToolUse (track_doc_impact) appends a record to docs/memory/pending-updates.jsonl
+    → /update-project-docs dedups, inspects the FINAL git diff, maps source→doc,
+      classifies impact, regenerates docs/generated/, updates curated docs
+      ONLY when behavior is established, validates
+    → resolved records are removed
+```
+
+Hooks detect impact + enforce policy (fast, deterministic). Skills/agents perform
+semantic analysis. Python workflows own discovery, mapping, validation and I/O.
+**Never document speculative or unfinished implementation as current behavior.**
+
+## Hooks
+
+Project hooks are wired in `.claude/settings.json`; machine-specific overrides in
+`.claude/settings.local.json`; scripts in `.claude/hooks/` (all stdlib-only Python
+via `uv run --no-project`). Hooks stay fast, deterministic and narrowly scoped;
+no LLM calls, no recursive doc rewrites.
+
+| Hook | Event | Role |
+|------|-------|------|
+| `session_start.py` | SessionStart | Inject **compact** authoritative context: doc policy, vault index, stale-doc warnings, unresolved-queue count. Never dump the vault; never duplicate `claude-mem`. |
+| `classify_prompt.py` | UserPromptSubmit | Deterministic keyword → task category; point at relevant `docs/` folders. No repo-wide LLM analysis. |
+| `protect_docs.py` | PreToolUse | Enforce hard rules: block edits to `docs/generated/`, direct writes into the `workspace/` mirror, unsafe git against a mirror, and reads of secrets. |
+| `track_doc_impact.py` | PostToolUse | Record edited `workspace/` paths into the reconciliation queue. No LLM, no doc rewrites. |
+| `validate_docs.py` | Stop | Cheap Markdown/metadata validation + unresolved-impact reminder. A `Stop` does not prove the feature is done. Avoid recursion. |
+| `session_end.py` | SessionEnd | Persist unresolved warnings, refresh cheap indexes, record undocumented source paths. No episodic duplication. |
+
+## Working on workspace repositories
+
+Repos are mirrored under `workspace/<group>/…/<repo>` by `/clone-repos`. The
+mirror is a **pristine synchronization target** — do not do feature work in it.
+
+To modify a repo: create an isolated Git worktree + branch (`EnterWorktree` or
+`superpowers:using-git-worktrees`), make changes there, run tests/linters, inspect
+the final diff, reconcile affected docs, then open an MR / merge, and remove the
+worktree. This keeps `workspace/` clones fast-forwardable and isolates parallel work.
+
+Do **not** commit feature changes from a mirror, leave untracked generated files in
+a mirror, reset/clean a dirty repo, reuse an unrelated worktree, or modify a default
+branch unless explicitly told to.
 
 ## Folders
 
-- **`workspace/`** — mirrored clones of the workspace repos (git-ignored).
-- **`wiki/`** — the curated Obsidian long-term-memory vault (git-ignored).
-- **`workflows/`** — full `uv run` Python scripts. All inputs via `args`.
-- **`.claude/skills/`** — thin launchers that invoke a workflow.
-- **`config/`** — holds `hub.config.yaml` (git-ignored). Currently **vestigial**:
-  the remaining `clone-repos` skill hardcodes its own group list, so nothing reads
-  this file today. Kept for future config-driven skills.
-- **`playground/`** — disposable / random scripts (git-ignored).
+- **`hub_lib/`** — stdlib-only shared logic (queue, front-matter, paths, classify,
+  validate). Imported by hooks, workflows and tests.
+- **`workflows/`** — substantial committed Python; all inputs via args/env.
+- **`.claude/skills/`** — thin launchers (orchestrate workflows + `Agent`).
+- **`.claude/hooks/`** — committed stdlib-only hook scripts.
+- **`docs/`** — curated Layer-2 vault (tracked; `generated/` + `memory/` ignored).
+- **`tests/`** — pytest over `hub_lib` (`uv run --dev pytest`).
+- **`workspace/`** — mirrored clones (git-ignored, pristine).
+- **`config/`** — `hub.config.yaml`; currently **vestigial** (clone-repos hardcodes
+  its groups, so nothing reads it today).
+- **`playground/`** — disposable experiments (git-ignored).
 - **`data/`** — generated outputs (git-ignored).
 
 ## Skills
 
-- **`/clone-repos`** — mirrors every GitLab project under the configured
-  `skillcorner` groups to `./workspace/<group>/…/<repo>`. Clones missing repos,
-  fast-forwards existing clean ones onto their default branch, and **skips any
-  repo with uncommitted changes**. Reads `GITLAB_TOKEN` from the environment (a
-  `read_api` + `read_repository` PAT); never stores it. Groups/destination are
-  hardcoded in `workflows/clone_repos.py`. Run `--dry-run` for a preview.
+- **`/clone-repos`** — mirror every GitLab project under the configured
+  `skillcorner` groups into `workspace/<group>/…/<repo>`. Clones missing repos,
+  fast-forwards clean ones, skips dirty ones. Reads `GITLAB_TOKEN` from the
+  environment (`read_api` + `read_repository`); never stores it. `--dry-run` previews.
+- **`/ingest-repository`** — inventory a repo deterministically, dispatch agents to
+  analyze meaningful components, create/update graph nodes and knowledge, record
+  source paths + verification metadata. Skip trivial modules.
+- **`/update-project-docs`** — consume the reconciliation queue: dedup, inspect the
+  git diff, resolve affected docs, classify impact, regenerate `generated/`, update
+  curated docs when behavior is established, create/update an ADR when required,
+  validate, then remove resolved queue entries.
+- **`/validate-docs`** — front-matter, internal links, generated-file markers,
+  source-path existence, duplicates, required metadata, stale/deprecated reporting,
+  unresolved-queue summary.
+- **`/create-adr`** — stamp a numbered ADR (context, decision, alternatives,
+  consequences, status) from the template.
+- **`/refresh-project-graph`** — regenerate the machine graph index from `graph/`
+  node front-matter.
+- **`/find-project-knowledge`** — deterministic search across the vault
+  (content + front-matter), optionally ranked by an agent.
 
-## Conventions
+## Source of truth
 
-- The tracked Markdown is `README.md` and `CLAUDE.md`. The `wiki/` vault and
-  `workspace/` clones are git-ignored (maintained locally per machine).
-- **Secrets:** connector *auth* lives in the Claude app / MCP connectors, never in
-  this repo. `GITLAB_TOKEN` comes from the environment (see `.claude/hub-env`).
-- **Connector availability:** MCP connectors are present in cloud routines but may
-  be absent in local runs.
-  
-  
+Precedence: (1) current source/schemas/tests/IaC, (2) current `docs/`,
+(3) `docs/generated/`, (4) `claude-mem` observations, (5) unverified assumptions.
+When sources disagree, inspect the implementation, decide whether a doc is stale,
+and update or mark it — never silently pick the easiest source.
+
+## Secrets
+
+Connector auth lives in the Claude app / MCP connectors, never in this repo.
+`GITLAB_TOKEN` comes from the environment (`.claude/hub-env` shim). Never commit
+secrets, copy them into docs/prompts/reports, print full tokens in logs, or persist
+connector auth in `docs/`, `data/`, or `claude-mem`.
+
+## Connector availability
+
+MCP connectors may exist in cloud routines but be absent locally. Skills and
+workflows tolerate unavailable connectors, report missing capabilities clearly,
+use deterministic local alternatives where possible, and **never fabricate
+connector results**.
+
+## Documentation quality
+
+Prefer concise, high-signal notes. A useful doc answers at least one of: what does
+this own? why does this design exist? what invariant must hold? how does this
+workflow progress? what contract connects these systems? how do I diagnose/recover
+this failure? what is dangerous to change without understanding first? Verify
+against source, update the existing doc where possible, add relationships, record
+source paths, set `last_verified`, and don't duplicate a fact across many notes.
+The vault should grow more coherent, not merely larger.
