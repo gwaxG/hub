@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kubectl guide — football-metadata-service</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --ink: #e7e9ee; --muted: #9aa3b2;
+    --line: #262b36; --accent: #29d17c; --warn: #f2b705; --danger: #ff5c5c; --code: #10131a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 40px 22px 80px; }
+  h1 { font-size: 28px; margin: 0 0 6px; }
+  h2 { font-size: 20px; margin: 38px 0 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+  h3 { font-size: 15px; margin: 22px 0 6px; color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+  p, li { color: var(--ink); }
+  .sub { color: var(--muted); margin: 0 0 8px; }
+  code { background: var(--code); padding: 1px 6px; border-radius: 4px; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: #d7e0ea; }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 10px 0; }
+  pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+  .cmt { color: #6f7a8a; }
+  a { color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); color: var(--muted); font-weight: 600; }
+  .note, .warn, .danger { border-radius: 8px; padding: 12px 16px; margin: 14px 0; border: 1px solid var(--line); background: var(--panel); }
+  .note { border-left: 3px solid var(--accent); }
+  .warn { border-left: 3px solid var(--warn); }
+  .danger { border-left: 3px solid var(--danger); }
+  .warn b, .warn strong { color: var(--warn); }
+  .danger b, .danger strong { color: var(--danger); }
+  kbd { background: #222732; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+  .lead { color: var(--muted); font-size: 16px; }
+  ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>kubectl for football-metadata-service</h1>
+<p class="lead">A practical guide to inspecting and operating this service on EKS — what's deployed, how to observe it, how to run the ingestion job on demand, and what <em>not</em> to do.</p>
+
+<div class="warn">
+<b>GitOps first.</b> ArgoCD is the source of truth: it renders this service's chart
+(<code>football-metadata-service-chart</code>) and continuously reconciles the cluster to match it.
+Treat <code>kubectl</code> as <b>read &amp; observe</b> + <b>run one-off jobs</b>. Anything that changes
+<i>desired state</i> (<code>kubectl edit</code>, <code>scale</code>, <code>apply</code>, <code>set image</code>)
+will be <b>reverted by ArgoCD</b> — make those changes in the chart repo instead.
+</div>
+
+<h2>1. Prerequisites</h2>
+<p class="sub">You need cluster credentials (kubeconfig) built from an AWS role that can reach the EKS cluster (account <code>891239948857</code>, <code>us-east-1</code>).</p>
+<pre><code><span class="cmt"># one-time: point kubeconfig at the cluster (find the cluster name with `aws eks list-clusters`)</span>
+aws eks update-kubeconfig --name &lt;cluster&gt; --region us-east-1 --profile Production.Skcr-Software-Role
+
+kubectl config current-context        <span class="cmt"># confirm you're on the right cluster</span>
+kubectl auth can-i get pods -n football-metadata-service-dev</code></pre>
+
+<h3>Namespaces</h3>
+<table>
+<tr><th>Env</th><th>Namespace</th><th>ServiceAccount (IRSA)</th><th>Public host</th></tr>
+<tr><td>dev</td><td><code>football-metadata-service-dev</code></td><td><code>football-metadata-service-dev-sa</code></td><td>football-metadata-service-dev.skillcorner.com</td></tr>
+<tr><td>prod</td><td><code>football-metadata-service-prod</code></td><td><code>football-metadata-service-prod-sa</code></td><td>football-metadata-service.skillcorner.com</td></tr>
+</table>
+<p class="sub">Tip: export the namespace once so every command is shorter.</p>
+<pre><code>export NS=football-metadata-service-dev</code></pre>
+
+<h2>2. What's deployed (mental model)</h2>
+<p class="sub">The chart wraps <code>fastapi-base</code>. Most resources come from that dependency; only two are defined in our chart.</p>
+<table>
+<tr><th>Resource</th><th>What it is</th><th>Source</th></tr>
+<tr><td><code>Deployment</code> + <code>Service</code></td><td>The FastAPI API (uvicorn) serving <code>/api/*</code></td><td>fastapi-base</td></tr>
+<tr><td><code>CronJob</code> <code>…-ingest-players</code></td><td>Daily player ingestion (mirror wilson + heimspiel enrich)</td><td>chart values <code>cronJobs</code></td></tr>
+<tr><td><code>Job</code> (pre-upgrade hook)</td><td><code>alembic upgrade head</code> — runs before each deploy</td><td>fastapi-base <code>dbMigration</code></td></tr>
+<tr><td><code>ServiceAccount</code></td><td>IRSA — grants the pods an AWS role (SSM / Secrets Manager / Aurora)</td><td>fastapi-base</td></tr>
+<tr><td><code>HTTPRoute</code>, <code>SecurityPolicy</code></td><td>Gateway API route for docs + Envoy JWT validation</td><td>our chart templates</td></tr>
+<tr><td>HPA, PodDisruptionBudget, ServiceMonitor</td><td>autoscaling / availability / Prometheus scrape</td><td>fastapi-base</td></tr>
+</table>
+<div class="note">
+<b>Secrets are not Kubernetes secrets.</b> The service's own DB creds are read at runtime via
+<code>pires</code> + IRSA from AWS (see <code>app/core/settings.py</code>), and the ingestion job reads
+<b>wilson's</b> DB via <code>son</code> (which fetches wilson's DB creds from AWS too). So
+<code>kubectl get secret</code> will <b>not</b> show them — check the <code>ServiceAccount</code>'s
+<code>eks.amazonaws.com/role-arn</code> annotation and the AWS secret paths instead. The ingestion
+pod additionally needs network reach to wilson's Aurora and IAM to read wilson's DB-creds secret.
+</div>
+
+<h2>3. Everyday inspection</h2>
+<pre><code>kubectl get all -n $NS                              <span class="cmt"># pods, svc, deploy, cronjob, jobs at a glance</span>
+kubectl get pods -n $NS -o wide                     <span class="cmt"># node, IP, restarts</span>
+kubectl describe pod &lt;pod&gt; -n $NS                    <span class="cmt"># events, env, mounts, why it won't start</span>
+kubectl logs -n $NS deploy/&lt;app-deploy&gt; -f           <span class="cmt"># follow API logs</span>
+kubectl logs -n $NS &lt;pod&gt; --previous                 <span class="cmt"># logs of the last crashed container</span>
+kubectl get events -n $NS --sort-by=.lastTimestamp  <span class="cmt"># recent cluster events (scheduling, pulls, OOM)</span>
+kubectl rollout status deploy/&lt;app-deploy&gt; -n $NS    <span class="cmt"># is the latest deploy healthy?</span></code></pre>
+
+<h2>4. The ingestion CronJob (the useful part)</h2>
+<p class="sub">Runs daily — dev <code>03:00 UTC</code>, prod <code>02:00 UTC</code>. Command: <code>python -m app.ingestion</code>. It mirrors wilson players (create-only) and enriches the newly-created heimspiel-matched ones.</p>
+<pre><code><span class="cmt"># find the exact (release-prefixed) name + schedule + last run</span>
+kubectl get cronjob -n $NS
+CJ=$(kubectl get cronjob -n $NS -o name | grep ingest-players)
+
+<span class="cmt"># trigger it NOW as a one-off Job (uses the exact cronjob spec: image, IRSA, env, resources)</span>
+kubectl create job -n $NS --from=$CJ ingest-players-manual-$(date +%s)
+
+<span class="cmt"># watch it</span>
+kubectl get jobs,pods -n $NS | grep ingest-players
+kubectl logs -n $NS job/ingest-players-manual-&lt;ts&gt; -f</code></pre>
+<div class="note">
+Expected log tail: <code>Ingest done: N created, M enriched, 0 failed</code>. Because ingestion is
+<b>create-only</b>, re-running after players already exist prints <code>created: 0</code> and enriches nothing
+new — that's normal, not a bug. The heavy run is the first one.
+</div>
+<div class="warn">
+<b>Most common failure: can't reach wilson's DB.</b> Ingestion reads wilson via <code>son</code>, which
+bootstraps from <code>SKILLCORNER_ENV</code> and fetches wilson's DB creds from AWS. A boot/connect error
+(<code>OperationalError</code>, timeout, or a Pires/secrets error) means the pod lacks <b>network reach to
+wilson's Aurora</b> or <b>IAM to read wilson's DB-creds secret</b>. Fix the IRSA grant / networking, then re-trigger.
+</div>
+
+<h3>Pause / resume the schedule (temporary, will drift from Git)</h3>
+<pre><code>kubectl patch $CJ -n $NS -p '{"spec":{"suspend":true}}'   <span class="cmt"># pause; ArgoCD may re-sync it back</span></code></pre>
+<p class="sub">For a durable change (schedule, suspend, command) edit <code>environments/&lt;env&gt;/values.yaml</code> in the chart repo instead.</p>
+
+<h2>5. Debugging a failing pod / job</h2>
+<pre><code>kubectl describe pod &lt;pod&gt; -n $NS                    <span class="cmt"># Events section: ImagePull, OOMKilled, CrashLoop, probe fails</span>
+kubectl logs &lt;pod&gt; -n $NS --previous                 <span class="cmt"># the crash output</span>
+kubectl get pod &lt;pod&gt; -n $NS -o jsonpath='{.status.containerStatuses[0].state}{"\n"}'</code></pre>
+<table>
+<tr><th>Symptom</th><th>Usual cause</th></tr>
+<tr><td><code>OperationalError</code> / DB connect timeout</td><td><code>son</code> can't reach wilson's Aurora (network) or read its DB-creds secret (IAM)</td></tr>
+<tr><td><code>CreateContainerConfigError</code> / can't read secret</td><td>IRSA role or secret path wrong</td></tr>
+<tr><td>Migration Job fails on deploy</td><td>Alembic revision mismatch — check the pre-upgrade hook Job logs</td></tr>
+<tr><td><code>ErrImagePull</code></td><td>Image tag in chart values not pushed to ECR yet</td></tr>
+</table>
+
+<h2>6. Run a command in-cluster</h2>
+<pre><code><span class="cmt"># open a shell in the running API pod (shares its image, IRSA, env)</span>
+kubectl exec -it -n $NS deploy/&lt;app-deploy&gt; -- bash
+
+<span class="cmt"># or run the ingestion directly in the app pod (alternative to the one-off Job)</span>
+kubectl exec -n $NS deploy/&lt;app-deploy&gt; -- python -m app.ingestion</code></pre>
+<p class="sub">The DB is Aurora (not in-cluster). To query it use the app's own <code>scripts/psql_connect.py</code> with the right AWS profile, or a bastion — not <code>kubectl</code>.</p>
+
+<h2>7. Hit the API / metrics locally</h2>
+<pre><code>kubectl port-forward -n $NS svc/&lt;app-svc&gt; 8080:80
+
+curl localhost:8080/api/docs        <span class="cmt"># OpenAPI UI</span>
+curl localhost:8080/metrics         <span class="cmt"># Prometheus (players_synced_total, players_enriched_total, …)</span>
+<span class="cmt"># /api/players requires a bearer JWT (see ADR on interim HS256 auth)</span></code></pre>
+
+<h2>8. Safety notes</h2>
+<div class="danger">
+<b>Never</b> <code>kubectl edit</code>/<code>apply</code>/<code>delete</code> a managed resource to "fix" prod — ArgoCD
+reverts it and you've hidden the real change from Git. The only durable path is a chart-repo MR.
+Exceptions that are safe &amp; ephemeral: creating a one-off <code>Job --from=cronjob</code>, reading logs,
+<code>exec</code>, <code>port-forward</code>, <code>describe</code>. Double-check <code>$NS</code> before every prod command.
+</div>
+
+<h2>Quick reference</h2>
+<table>
+<tr><th>Task</th><th>Command</th></tr>
+<tr><td>Set namespace</td><td><code>export NS=football-metadata-service-dev</code></td></tr>
+<tr><td>Overview</td><td><code>kubectl get all -n $NS</code></td></tr>
+<tr><td>API logs</td><td><code>kubectl logs -n $NS deploy/&lt;app&gt; -f</code></td></tr>
+<tr><td>Find cron</td><td><code>kubectl get cronjob -n $NS</code></td></tr>
+<tr><td>Run ingestion now</td><td><code>kubectl create job -n $NS --from=cronjob/&lt;name&gt; ingest-players-manual-$(date +%s)</code></td></tr>
+<tr><td>Job logs</td><td><code>kubectl logs -n $NS job/&lt;job&gt; -f</code></td></tr>
+<tr><td>Why won't it start</td><td><code>kubectl describe pod &lt;pod&gt; -n $NS</code></td></tr>
+<tr><td>Reach API/metrics</td><td><code>kubectl port-forward -n $NS svc/&lt;svc&gt; 8080:80</code></td></tr>
+</table>
+
+<p class="sub" style="margin-top:36px">Placeholders <code>&lt;app-deploy&gt;</code>/<code>&lt;app-svc&gt;</code>/<code>&lt;name&gt;</code>/<code>&lt;cluster&gt;</code> are release-specific — discover them with <code>kubectl get deploy,svc,cronjob -n $NS</code> and <code>aws eks list-clusters</code>. Deployment/scheduling live in <code>football-metadata-service-chart</code>; the ingestion flow is <code>app/ingestion/players.py</code>.</p>
+
+</div>
+</body>
+</html>
