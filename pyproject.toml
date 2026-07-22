@@ -4,25 +4,10 @@ version = "0.1.0"
 description = "Claude Ops Hub — project-agnostic control layer for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
-# Shared deps for workflows and the test suite. Hooks stay stdlib-only and run
-# via `uv run --no-project`, so they never depend on anything here.
-dependencies = [
-    "requests",
-    "pyyaml",
-]
+dependencies = []
 
-[dependency-groups]
-dev = ["pytest"]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-# hub_lib is a normal importable module inside the project env (no sys.path
-# hacks for workflows/tests). Hooks reach it via a small sys.path insert.
-packages = ["hub_lib"]
-
-[tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests"]
+# No importable package left in this repo (workflows/clone_repos.py is a
+# self-contained PEP 723 script with its own inline dependencies) — nothing
+# to build or install.
+[tool.uv]
+package = false
