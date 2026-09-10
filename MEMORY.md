@@ -11,3 +11,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 ## football-metadata-service
 
 - [kubectl guide](docs/football-metadata-service-kubectl.html) — operational kubectl commands for the football-metadata-service cluster
+
+## wilson
+
+- [Wilson metadata inventory](docs/wilson-metadata-inventory.md) — what counts as metadata in wilson (descriptive domain entities + operational/internal), what clients consume, and the bounded context for the FMS migration

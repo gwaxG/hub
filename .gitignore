@@ -22,3 +22,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 .DS_Store
+
+# Ad-hoc git worktrees of workspace mirrors (<slug>-wt/<repo>) — checkouts of
+# other repos that happen to live here; never part of the hub.
+*-wt/

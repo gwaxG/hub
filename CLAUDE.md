@@ -13,6 +13,11 @@ installed. Root `pyproject.toml` is metadata only (`[tool.uv] package = false`).
 **No JavaScript or TypeScript.** Deterministic work belongs in Python; don't ask
 an LLM to do what Python can do reliably.
 
+## Working on the hub itself
+
+You create worktrees in the folder /worktrees. 
+You do the implementation, create a branch, commit and push to origin, open MR, assign to me - "andrei.mitriakov@skillcorner.com".
+
 ## Working on workspace repositories
 
 `workflows/clone_repos.py` mirrors every GitLab project under the configured
@@ -45,6 +50,12 @@ lake coherent.
 The vault is a best-effort snapshot, **not authoritative** — verify against
 current source before trusting a note. (`claude-mem` separately keeps automatic
 episodic session history; don't duplicate that here.)
+
+Inject MEMORY.md in the sesion context at the beginning of every session.
+Write memory files into /docs in cases when:
+  (1) you discover new things about existing codebase like behaviour, workflows etc;
+  (2) you implement something new in codebase like features, workflows etc.
+Remove or modify obsolete files if they do not correspond to the reality.
 
 ## Secrets
 
