@@ -14,4 +14,5 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 
 ## wilson
 
+- [son schema changes vs football lambdas](docs/son-schema-changes-break-football-lambdas.md) — dropping a son column breaks football lambdas on older son (they SELECT every declared column); rollout order + who lazy-loads Player
 - [Wilson metadata inventory](docs/wilson-metadata-inventory.md) — what counts as metadata in wilson (descriptive domain entities + operational/internal), what clients consume, and the bounded context for the FMS migration
