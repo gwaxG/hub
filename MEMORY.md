@@ -20,3 +20,4 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 
 - [son schema changes vs football lambdas](docs/son-schema-changes-break-football-lambdas.md) — dropping a son column breaks football + wilson lambdas on older son (they SELECT every declared column); who loads Player, pirlo prerelease relock flow, rollout order
 - [Wilson metadata inventory](docs/wilson-metadata-inventory.md) — what counts as metadata in wilson (descriptive domain entities + operational/internal), what clients consume, and the bounded context for the FMS migration
+- [No video on S3 on dev](docs/no-video-on-s3-on-dev.md) — dev pipeline check falls back to legacy skcr-algo-dev mp4 when the vidic-v2 Video row wasn't copied
