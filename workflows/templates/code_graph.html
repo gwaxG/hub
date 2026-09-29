@@ -1,0 +1,302 @@
+<!doctype html>
+<!--
+  code_graph.html — report template for workflows/code_graph.py.
+
+  The script fills four placeholders: {{TITLE}}, {{REPO}}, {{GENERATED}} and
+  {{PAYLOAD}} (the analysis JSON, injected as a JS object literal). Everything
+  else is static: no external scripts, no CDN, no fonts required — the page is
+  fully usable offline. Styling follows the SkillCorner visual identity
+  (dark green gradient, neon-green accents, Chakra Petch with a sans fallback).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<!-- Brand font, loaded non-blocking: a pending stylesheet would defer layout and
+     the canvases would size themselves to zero width. Offline it just never arrives. -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&display=swap">
+<style>
+{{STYLE}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="wordmark"><b>SKILL</b>CORNER</div>
+  <h1>{{REPO}}</h1>
+  <div class="sub">Import graph &amp; code metrics</div>
+  <div class="meta" id="meta"></div>
+</header>
+
+<section>
+  <h2>Summary</h2>
+  <div class="cards" id="cards"></div>
+</section>
+
+<section>
+  <h2>Dependency graph</h2>
+  <p class="hint">Force-directed import graph — node size is lines of code, colour is layer,
+     arrows point from importer to imported. Hover a node for its metrics; click one to isolate
+     it and its direct neighbours, click the background to reset.</p>
+  <div class="panel"><canvas id="graph" height="620"></canvas>
+    <div class="legend" id="legend"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Dependency matrix</h2>
+  <p class="hint">Rows import columns, ordered so that dependencies run downstream
+     (importers first). Every ordinary import therefore sits <em>above</em> the diagonal — an amber
+     cell <em>below</em> it is a back-edge, i.e. part of a dependency cycle. Hover any cell for the pair.</p>
+  <div class="panel"><canvas id="dsm" height="620"></canvas></div>
+</section>
+
+<section id="layer-section">
+  <h2>Layer coupling</h2>
+  <p class="hint">Imports from each layer (row) into each layer (column). This is the matrix an
+     <code>import-linter</code> contract would police: decide which cells are allowed to be
+     non-zero, and everything else becomes a CI failure.</p>
+  <div class="panel" style="overflow:auto"><div id="layers"></div></div>
+</section>
+
+<section>
+  <h2>Dependency cycles</h2>
+  <p class="hint">Strongly connected components — every member can reach every other, so none of
+     them can be understood, tested, or extracted alone.</p>
+  <ul class="cycles" id="cycles"></ul>
+</section>
+
+<section>
+  <h2>Node metrics</h2>
+  <p class="hint"><b>Ca/Ce</b> fan-in / fan-out · <b>I</b> instability Ce/(Ca+Ce) · <b>A</b> abstractness ·
+     <b>Dist</b> |A+I−1|, distance from the main sequence (high = painful to change or useless abstraction) ·
+     <b>CC</b> worst cyclomatic complexity · <b>MI</b> maintainability index (&lt;65 is poor) ·
+     <b>Churn</b> lines changed in the window · <b>Auth</b> distinct authors (1 = bus factor 1).
+     Click a header to sort.</p>
+  <div class="toolbar">
+    <input type="search" id="filter" placeholder="filter nodes…" autocomplete="off">
+    <span class="tag" id="count"></span>
+  </div>
+  <div class="scroll"><table id="nodes"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <h2>Hotspots</h2>
+  <p class="hint">Per file, normalised <em>churn × complexity</em>. Complexity only hurts where the
+     code keeps changing — these files are where reading, testing and reviewing effort pays off most.</p>
+  <div class="grid2">
+    <div class="panel"><canvas id="scatter" height="380"></canvas></div>
+    <div class="scroll" style="max-height:400px"><table id="hot"><thead></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<footer id="footer"></footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = {{PAYLOAD}};
+
+{{HELPERS}}
+
+const layerColor = buildLayerColors(DATA.layers);
+
+/* ------------------------------------------------------------ header/cards */
+(function header() {
+  const m = DATA.meta;
+  $("meta").innerHTML =
+    `<code>${m.path}</code> · branch <code>${m.branch || "?"}</code> @ <code>${m.commit || "?"}</code>` +
+    ` · packages <code>${m.packages.join(", ")}</code> · level <code>${m.level}</code>` +
+    ` · history since <code>${m.since}</code> · excluded <code>${(m.excluded || []).join(", ") || "none"}</code>`;
+  $("footer").textContent =
+    `Generated ${m.generated} by workflows/code_graph.py · ${m.modules} modules, ` +
+    `${m.imports} imports · grimp + radon + git · read-only analysis, nothing was written to the repo.`;
+
+  const n = DATA.nodes;
+  const loc = n.reduce((a, x) => a + x.loc, 0);
+  const cyclic = DATA.cycles.reduce((a, c) => a + c.length, 0);
+  const soloed = n.filter((x) => x.authors === 1 && x.commits > 0).length;
+  const poorMi = n.filter((x) => x.mi < 65).length;
+  const cards = [
+    ["nodes", n.length, ""],
+    ["imports", DATA.edges.length, ""],
+    ["lines of code", fmt(loc), ""],
+    ["cycles", DATA.cycles.length, DATA.cycles.length ? "alert" : "good"],
+    ["nodes in a cycle", cyclic, cyclic ? "alert" : "good"],
+    ["median instability", median(n.map((x) => x.i)).toFixed(2), ""],
+    ["median MI", median(n.map((x) => x.mi)).toFixed(0), ""],
+    ["MI below 65", poorMi, poorMi ? "alert" : "good"],
+    ["bus factor 1", soloed, soloed ? "alert" : "good"],
+  ];
+  $("cards").innerHTML = cards.map(([k, v, cls]) =>
+    `<div class="card ${cls}"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
+
+  $("legend").innerHTML = DATA.layers.map((l) =>
+    `<span><i class="swatch" style="background:${layerColor[l]}"></i>${l}</span>`).join("");
+})();
+
+/* ------------------------------------------------------------ force graph */
+const Graph = createForceGraph({
+  canvas: $("graph"),
+  nodes: DATA.nodes,
+  edges: DATA.edges,
+  colorFor: (node) => layerColor[node.layer] || "#B0B0B0",
+  tooltipFor: (x) =>
+    `<b>${x.id}</b><br>layer ${x.layer} · ${x.files} file(s) · ${x.loc} loc<br>` +
+    `fan-in ${x.ca} / fan-out ${x.ce} · I=${x.i} · A=${x.a} · dist=${x.dist}<br>` +
+    `cc max ${x.cc_max} · MI ${x.mi} · ${x.commits} commits · churn ${x.churn} · ${x.authors} author(s)`,
+});
+
+/* ----------------------------------------------------------- import matrix */
+const inCycle = new Set(DATA.cycles.flat());
+const Matrix = createMatrix({
+  canvas: $("dsm"),
+  nodes: DATA.nodes,
+  edges: DATA.edges,
+  order: DATA.dsm_order,
+  cellColor: (e, r, c) => {
+    const cyc = r > c || (inCycle.has(DATA.nodes[e.s].id) && inCycle.has(DATA.nodes[e.t].id));
+    return cyc ? "#FFD966" : `rgba(50,254,107,${Math.min(1, 0.45 + e.w * 0.12)})`;
+  },
+  tooltipFor: (from, into, r, c) => {
+    const back = r > c ? '<br><span style="color:var(--warn)">below the diagonal — back-edge</span>' : "";
+    return `<b>${from.id}</b> <span style="color:${layerColor[from.layer]}">●</span><br>imports<br>` +
+      `<b>${into.id}</b> <span style="color:${layerColor[into.layer]}">●</span>${back}`;
+  },
+});
+
+/* ----------------------------------------------------------- layer matrix */
+(function layerMatrix() {
+  const { layers, matrix } = DATA;
+  if (layers.length === DATA.nodes.length || layers.length < 2) {
+    $("layer-section").style.display = "none";
+    return;
+  }
+  const head = "<tr><th>from \u2193 / into \u2192</th>" +
+    layers.map((l) => `<th>${l.split(".").pop()}</th>`).join("") + "</tr>";
+  const body = layers.map((l, i) =>
+    `<tr><td>${l}</td>` + matrix[i].map((v, j) => {
+      if (!v) return "<td style='color:rgba(255,255,255,.18)'>·</td>";
+      const self = i === j, back = matrix[j][i] > 0 && !self;
+      const colour = self ? "color:var(--muted)"
+        : back ? "color:var(--warn);font-weight:700" : "color:var(--neon)";
+      return `<td style="${colour}">${v}</td>`;
+    }).join("") + "</tr>").join("");
+  $("layers").innerHTML = `<table>${head}${body}</table>` +
+    `<p class="hint" style="margin:.7rem 0 0">Amber = imports run both ways between those two layers.</p>`;
+})();
+
+/* ----------------------------------------------------------------- cycles */
+(function cycles() {
+  const host = $("cycles");
+  if (!DATA.cycles.length) {
+    host.innerHTML = '<li style="background:rgba(50,254,107,.08);border-left-color:var(--neon)">' +
+      '<b>None.</b> The graph is acyclic — every node can be understood on its own.</li>';
+    return;
+  }
+  host.innerHTML = DATA.cycles.map((c) =>
+    `<li><b>${c.length} nodes</b><br>${c.join(" · ")}</li>`).join("");
+})();
+
+/* ------------------------------------------------------------- node table */
+(function nodeTable() {
+  const columns = [
+    { k: "id", h: "node", f: (r) => `${r.id} <span style="color:${layerColor[r.layer]}">●</span>` },
+    { k: "files", h: "f", t: "files in this node" },
+    { k: "loc", h: "loc", t: "source lines of code" },
+    { k: "ca", h: "ca", t: "afferent coupling (fan-in)" },
+    { k: "ce", h: "ce", t: "efferent coupling (fan-out)" },
+    { k: "i", h: "i", t: "instability Ce/(Ca+Ce)", f: (r) => r.i.toFixed(2) },
+    { k: "a", h: "a", t: "abstractness (abstract classes / all classes)", f: (r) => r.a.toFixed(2) },
+    { k: "dist", h: "dist", t: "|A+I-1| — distance from the main sequence",
+      f: (r) => r.dist.toFixed(2), flag: (r) => r.dist > 0.7 ? "bad" : "" },
+    { k: "cc_max", h: "cc", t: "worst cyclomatic complexity",
+      flag: (r) => r.cc_max >= 20 ? "worst" : r.cc_max >= 11 ? "bad" : "" },
+    { k: "mi", h: "mi", t: "maintainability index (higher is better, <65 is poor)",
+      f: (r) => r.mi.toFixed(0), flag: (r) => r.mi < 65 ? "bad" : "" },
+    { k: "commits", h: "com", t: "commits in the window" },
+    { k: "churn", h: "churn", t: "lines added + deleted in the window" },
+    { k: "authors", h: "auth", t: "distinct authors in the window",
+      flag: (r) => r.authors === 1 ? "bad" : "" },
+  ];
+  const table = sortableTable("nodes", columns, DATA.nodes, "loc");
+  const show = (n) => { $("count").textContent = `${n} / ${DATA.nodes.length} nodes`; };
+  show(DATA.nodes.length);
+  $("filter").addEventListener("input", (ev) => {
+    const q = ev.target.value.trim().toLowerCase();
+    show(table.filter((r) => !q || r.id.toLowerCase().includes(q)));
+  });
+})();
+
+/* --------------------------------------------------------------- hotspots */
+const Scatter = (function () {
+  const canvas = $("scatter");
+  const rows = DATA.hotspots;
+  let points = [];
+
+  canvas.addEventListener("mousemove", (ev) => {
+    const box = canvas.getBoundingClientRect();
+    const mx = ev.clientX - box.left, my = ev.clientY - box.top;
+    const near = points.find((p) => Math.hypot(p.x - mx, p.y - my) < 3 + 7 * p.r.score + 4);
+    if (!near) return hideTip();
+    const r = near.r;
+    showTip(`<b>${r.path}</b><br>score ${r.score.toFixed(3)} · churn ${r.churn} lines<br>` +
+      `cc ${r.cc_max} · MI ${r.mi} · ${r.loc} loc · ${r.authors} author(s)`, ev);
+  });
+  canvas.addEventListener("mouseleave", hideTip);
+
+  function render() {
+    const fit = fitCanvas(canvas);
+    if (!fit) return;
+    const { ctx, w, h } = fit;
+    if (!rows.length) return noData(ctx, "no git history in this window");
+    const pad = 42;
+    const maxChurn = Math.max(...rows.map((r) => r.churn), 1);
+    const maxCc = Math.max(...rows.map((r) => r.cc_max), 1);
+    const sx = (v) => pad + (v / maxChurn) * (w - pad - 18);
+    const sy = (v) => h - pad - (v / maxCc) * (h - pad - 18);
+
+    ctx.strokeStyle = "rgba(255,255,255,.16)";
+    ctx.beginPath(); ctx.moveTo(pad, 10); ctx.lineTo(pad, h - pad); ctx.lineTo(w - 10, h - pad); ctx.stroke();
+    ctx.fillStyle = "#9E9E9E";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText("churn (lines changed) \u2192", pad + 4, h - pad + 16);
+    ctx.fillText(String(maxChurn), w - 42, h - pad + 16);
+    ctx.fillText(String(maxCc), 16, 16);
+    ctx.save();
+    ctx.translate(12, h - pad);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("worst cyclomatic complexity \u2192", 0, 0);
+    ctx.restore();
+
+    points = rows.map((r) => ({ r, x: sx(r.churn), y: sy(r.cc_max) }));
+    points.forEach(({ r, x, y }) => {
+      ctx.beginPath();
+      ctx.arc(x, y, 3 + 7 * r.score, 0, Math.PI * 2);
+      ctx.fillStyle = r.score > 0.35 ? "rgba(255,138,106,.85)"
+        : r.score > 0.12 ? "rgba(255,217,102,.8)" : "rgba(50,254,107,.7)";
+      ctx.fill();
+    });
+  }
+
+  sortableTable("hot", [
+    { k: "path", h: "file" },
+    { k: "score", h: "score", t: "normalised churn x complexity", f: (r) => r.score.toFixed(3) },
+    { k: "churn", h: "churn", t: "lines added + deleted in the window" },
+    { k: "cc_max", h: "cc", t: "worst cyclomatic complexity",
+      flag: (r) => r.cc_max >= 20 ? "worst" : r.cc_max >= 11 ? "bad" : "" },
+    { k: "mi", h: "mi", t: "maintainability index", f: (r) => r.mi.toFixed(0),
+      flag: (r) => r.mi < 65 ? "bad" : "" },
+    { k: "loc", h: "loc" },
+    { k: "authors", h: "auth", t: "distinct authors in the window" },
+  ], rows, "score");
+  return { render };
+})();
+
+scheduleRenders([Graph, Matrix, Scatter]);
+</script>
+</body>
+</html>

@@ -4,6 +4,10 @@ Index of the `docs/` file lake — one line per file, grouped by system.
 Hand-maintained: whoever adds, renames, or removes a file in `docs/` updates
 its line here in the same change. Line format: `- [title](docs/slug.md) — one-line hook`.
 
+## hub
+
+- [hub-graph / hub-mr code graph tools](docs/hub-graph-code-graph-tool.md) — `hub-graph` (whole repo) + `hub-mr` (feature integration vs merge base) over one shared engine; artefacts in `hub/tmp`; the sys.path-root, topological-order and base-comparability traps
+
 ## data-provider-clients
 
 - [Heimspiel extra time & penalty shootouts](docs/heimspiel-extra-time-and-penalties.md) — how the Heimspiel client models knockout matches past 90'; two data sources (result periods + events) needed together

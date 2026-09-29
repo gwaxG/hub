@@ -5,6 +5,8 @@ data/*
 playground/*
 !playground/.gitkeep
 !playground/README.md
+tmp/*
+!tmp/.gitkeep
 
 # Legacy Obsidian vault — retired from the hub's memory story; ignore any
 # machine-local leftover so it never lands in git.

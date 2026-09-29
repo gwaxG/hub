@@ -1,0 +1,306 @@
+<!doctype html>
+<!--
+  mr_graph.html — report template for workflows/mr_graph.py.
+
+  The script fills four placeholders: {{TITLE}}, {{REPO}}, {{GENERATED}} and
+  {{PAYLOAD}} (the analysis JSON, injected as a JS object literal). Everything
+  else is static: no external scripts, no CDN, no fonts required — the page is
+  fully usable offline. Styling follows the SkillCorner visual identity
+  (dark green gradient, neon-green accents, Chakra Petch with a sans fallback).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<!-- Brand font, loaded non-blocking: a pending stylesheet would defer layout and
+     the canvases would size themselves to zero width. Offline it just never arrives. -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&display=swap">
+<style>
+{{STYLE}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="wordmark"><b>SKILL</b>CORNER</div>
+  <h1>{{REPO}}</h1>
+  <div class="sub" id="headline"></div>
+  <div class="meta" id="meta"></div>
+</header>
+
+<section>
+  <div class="verdict" id="verdict"></div>
+</section>
+
+<section>
+  <h2>Integration checks</h2>
+  <p class="hint">Named structural checks, not a score. <b>fail</b> is something to fix before
+     merging, <b>warn</b> is a deliberate decision to make, <b>note</b> is context worth knowing.</p>
+  <div id="checks"></div>
+</section>
+
+<section>
+  <h2>Is it a slope?</h2>
+  <p class="hint">Repo-level aggregates at the merge base versus at this head. A feature that
+     integrates well moves these barely at all; a slope shows up as several amber arrows at once.</p>
+  <div class="panel" style="overflow:auto"><div id="totals"></div></div>
+</section>
+
+<section>
+  <h2>Where the feature sits</h2>
+  <p class="hint">The whole dependency graph, with this change emphasised — <b>new</b> nodes ringed
+     in white, <b>touched</b> nodes lit, everything else dimmed to context. Lime edges are imports
+     this change introduced. Click a node to isolate its neighbours; use the buttons to narrow to
+     the feature and its immediate blast radius.</p>
+  <div class="toolbar">
+    <button id="scope-all" class="pill on">whole repo</button>
+    <button id="scope-feature" class="pill">feature only</button>
+    <button id="scope-reach" class="pill">feature + neighbours</button>
+    <span class="tag" id="footprint"></span>
+  </div>
+  <div class="panel"><canvas id="graph" height="620"></canvas>
+    <div class="legend" id="legend"></div>
+  </div>
+</section>
+
+<section>
+  <h2>New imports</h2>
+  <p class="hint">Dependency matrix of the head revision, topologically ordered. Lime cells are
+     imports this change added; amber cells below the diagonal are back-edges (cycles).</p>
+  <div class="panel"><canvas id="dsm" height="620"></canvas></div>
+</section>
+
+<section id="layer-section">
+  <h2>Layer coupling, before and after</h2>
+  <p class="hint">Imports from each layer (row) into each layer (column) at this head. Lime = a pair
+     that gained imports, <b>bold lime</b> = a pair that had none at all before this change.</p>
+  <div class="panel" style="overflow:auto"><div id="layers"></div></div>
+</section>
+
+<section>
+  <h2>Nodes the feature added or touched</h2>
+  <p class="hint">Deltas against the merge base. <b>Δfan-in</b> rising on an existing node means the
+     feature reached into it; <b>ΔMI</b> falling and <b>Δcc</b> rising mean it got harder to maintain.</p>
+  <div class="scroll"><table id="nodes"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <h2>Changed files</h2>
+  <p class="hint">Every non-deleted Python file in the diff, worst churn × complexity first.
+     <b>T</b> marks a test file.</p>
+  <div class="scroll" style="max-height:460px"><table id="files"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<footer id="footer"></footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = {{PAYLOAD}};
+{{HELPERS}}
+
+const layerColor = buildLayerColors(DATA.layers);
+const STATUS_COLOR = { new: "#C8FF6A", touched: "#32FE6B", existing: "#4A6B52" };
+const isFeature = (node) => node.status === "new" || node.status === "touched";
+
+/* ---------------------------------------------------------------- header */
+(function header() {
+  const m = DATA.meta, v = DATA.verdict, d = DATA.delta;
+  $("headline").textContent = "Feature integration \u00b7 " + v.headline;
+  $("meta").innerHTML =
+    `<code>${m.path}</code> \u00b7 base <code>${m.base_commit}</code> \u2192 head ` +
+    `<code>${m.head_commit}</code> (<code>${m.head_branch || m.head_rev}</code>)` +
+    ` \u00b7 target <code>${m.target}</code> \u00b7 ${m.changed_files} changed python file(s)` +
+    ` \u00b7 level <code>${m.level}</code> \u00b7 history since <code>${m.since}</code>`;
+  $("footer").textContent =
+    `Generated ${m.generated} by workflows/mr_graph.py \u00b7 both revisions extracted with ` +
+    `git archive and analysed with grimp + radon + git \u00b7 committed state only, ` +
+    `uncommitted work is not included.`;
+
+  $("verdict").className = "verdict " + v.level;
+  $("verdict").innerHTML =
+    `<div class="vh">${v.headline}</div><div class="vd">${v.detail}</div>` +
+    `<div class="vstats">` +
+    `<span><b>${d.nodes_added.length}</b> new nodes</span>` +
+    `<span><b>${d.nodes_touched.length}</b> touched</span>` +
+    `<span><b>${d.edges_added.length}</b> new imports</span>` +
+    `<span><b>${d.layers_touched.length}</b> layer(s): ${d.layers_touched.join(", ") || "\u2014"}</span>` +
+    `<span><b>${d.edges_leaving_feature}</b> of those imports leave the feature</span>` +
+    `</div>`;
+
+  $("footprint").textContent =
+    `${d.nodes_added.length} new \u00b7 ${d.nodes_touched.length} touched \u00b7 ` +
+    `${DATA.nodes.length} nodes total`;
+
+  $("legend").innerHTML =
+    `<span><i class="swatch" style="background:${STATUS_COLOR.new}"></i>new</span>` +
+    `<span><i class="swatch" style="background:${STATUS_COLOR.touched}"></i>touched</span>` +
+    `<span><i class="swatch" style="background:${STATUS_COLOR.existing}"></i>existing</span>` +
+    `<span><i class="swatch" style="background:#C8FF6A;height:3px;border-radius:0"></i>import added by this change</span>`;
+})();
+
+/* ---------------------------------------------------------------- checks */
+(function checks() {
+  const icon = { pass: "\u2713", note: "i", warn: "!", fail: "\u2715" };
+  $("checks").innerHTML = DATA.checks.map((c) => {
+    const items = c.items.length
+      ? `<ul>${c.items.slice(0, 12).map((i) => `<li>${i}</li>`).join("")}` +
+        (c.items.length > 12 ? `<li class="empty">… ${c.items.length - 12} more</li>` : "") + "</ul>"
+      : "";
+    return `<div class="check ${c.status}">` +
+      `<div class="ct"><span class="ci">${icon[c.status]}</span>${c.title}` +
+      `<span class="cs">${c.status}</span></div>` +
+      `<div class="cd">${c.detail}</div>${items}</div>`;
+  }).join("");
+})();
+
+/* ---------------------------------------------------------------- totals */
+(function totals() {
+  const arrow = { better: "\u25bc", worse: "\u25b2", neutral: "\u2013" };
+  const rows = DATA.totals.map((t) => {
+    const sign = t.delta > 0 ? "+" : "";
+    return `<tr class="t-${t.verdict}"><td>${t.label}</td>` +
+      `<td>${t.base}</td><td>${t.head}</td>` +
+      `<td>${t.delta ? sign + t.delta : "\u00b7"}</td>` +
+      `<td>${t.delta ? arrow[t.verdict] : ""}</td></tr>`;
+  }).join("");
+  $("totals").innerHTML =
+    `<table><tr><th>metric</th><th>base</th><th>head</th><th>\u0394</th><th></th></tr>${rows}</table>` +
+    `<p class="hint" style="margin:.7rem 0 0">\u25bc improved \u00b7 \u25b2 worsened \u00b7 ` +
+    `\u2013 no directional meaning (size is not automatically bad).</p>`;
+})();
+
+/* ----------------------------------------------------------- force graph */
+const newPairs = new Set(DATA.delta.edges_added.map((e) => e.from + "\u0000" + e.into));
+const Graph = createForceGraph({
+  canvas: $("graph"),
+  nodes: DATA.nodes,
+  edges: DATA.edges,
+  colorFor: (node) => isFeature(node) ? STATUS_COLOR[node.status] : STATUS_COLOR.existing,
+  emphasise: (node) => node.status === "new",
+  edgeIsNew: (e) => !!e.new,
+  tooltipFor: (x) => {
+    const d = (v, unit) => v ? ` <span style="color:${v > 0 ? "#C8FF6A" : "#FF8A6A"}">(${v > 0 ? "+" : ""}${v}${unit || ""})</span>` : "";
+    return `<b>${x.id}</b> <span class="tag">${x.status}</span><br>` +
+      `layer ${x.layer} \u00b7 ${x.files} file(s) \u00b7 ${x.loc} loc${d(x.d_loc)}<br>` +
+      `fan-in ${x.ca}${d(x.d_ca)} / fan-out ${x.ce}${d(x.d_ce)} \u00b7 I=${x.i} \u00b7 dist=${x.dist}<br>` +
+      `cc max ${x.cc_max}${d(x.d_cc_max)} \u00b7 MI ${x.mi}${d(x.d_mi)}` +
+      (x.changed_paths.length ? `<br><span style="color:var(--lime)">${x.changed_paths.join("<br>")}</span>` : "");
+  },
+});
+
+(function scopes() {
+  const neighbours = new Map();
+  DATA.nodes.forEach((n) => neighbours.set(n.id, new Set()));
+  DATA.edges.forEach((e) => {
+    neighbours.get(DATA.nodes[e.s].id).add(DATA.nodes[e.t].id);
+    neighbours.get(DATA.nodes[e.t].id).add(DATA.nodes[e.s].id);
+  });
+  const featureIds = new Set(DATA.nodes.filter(isFeature).map((n) => n.id));
+  const reach = new Set(featureIds);
+  featureIds.forEach((id) => (neighbours.get(id) || []).forEach((x) => reach.add(x)));
+
+  const modes = {
+    "scope-all": null,
+    "scope-feature": (node) => featureIds.has(node.id),
+    "scope-reach": (node) => reach.has(node.id),
+  };
+  Object.keys(modes).forEach((id) => {
+    $(id).addEventListener("click", () => {
+      Object.keys(modes).forEach((other) => $(other).classList.toggle("on", other === id));
+      Graph.focusOn(modes[id]);
+    });
+  });
+})();
+
+/* ----------------------------------------------------------- new imports */
+const inCycle = new Set(DATA.cycles.flat());
+const Matrix = createMatrix({
+  canvas: $("dsm"),
+  nodes: DATA.nodes,
+  edges: DATA.edges,
+  order: DATA.dsm_order,
+  cellColor: (e, r, c) => {
+    if (r > c || (inCycle.has(DATA.nodes[e.s].id) && inCycle.has(DATA.nodes[e.t].id))) return "#FFD966";
+    return e.new ? "#C8FF6A" : `rgba(50,254,107,${Math.min(0.55, 0.22 + e.w * 0.08)})`;
+  },
+  tooltipFor: (from, into, r, c) => {
+    const key = from.id + "\u0000" + into.id;
+    const tags = [];
+    if (newPairs.has(key)) tags.push('<span style="color:var(--lime)">added by this change</span>');
+    if (r > c) tags.push('<span style="color:var(--warn)">back-edge (cycle)</span>');
+    return `<b>${from.id}</b><br>imports<br><b>${into.id}</b>` +
+      (tags.length ? "<br>" + tags.join("<br>") : "");
+  },
+});
+
+/* --------------------------------------------------------- layer coupling */
+(function layerMatrix() {
+  const { layers, matrix } = DATA;
+  if (layers.length < 2) { $("layer-section").style.display = "none"; return; }
+  const beforeLayers = DATA.base.layers, beforeMatrix = DATA.base.matrix;
+  const at = (a, b) => {
+    const i = beforeLayers.indexOf(a), j = beforeLayers.indexOf(b);
+    return i < 0 || j < 0 ? 0 : beforeMatrix[i][j];
+  };
+  const head = "<tr><th>from \u2193 / into \u2192</th>" +
+    layers.map((l) => `<th>${l.split(".").pop()}</th>`).join("") + "</tr>";
+  const body = layers.map((l, i) =>
+    `<tr><td>${l}</td>` + matrix[i].map((v, j) => {
+      const was = at(l, layers[j]);
+      if (!v) return "<td style='color:rgba(255,255,255,.18)'>\u00b7</td>";
+      if (i === j) return `<td style="color:var(--muted)">${v}</td>`;
+      if (!was) return `<td style="color:var(--lime);font-weight:700" title="new layer pair">${v}</td>`;
+      if (v > was) return `<td style="color:var(--lime)" title="was ${was}">${v}</td>`;
+      return `<td style="color:var(--neon)">${v}</td>`;
+    }).join("") + "</tr>").join("");
+  $("layers").innerHTML = `<table>${head}${body}</table>`;
+})();
+
+/* ------------------------------------------------------------ node table */
+(function nodeTable() {
+  const rows = DATA.nodes.filter(isFeature);
+  const delta = (k) => (r) => r[k] ? (r[k] > 0 ? "+" : "") + r[k] : "\u00b7";
+  const flag = (k, worseWhen) => (r) =>
+    r[k] && (worseWhen === "up" ? r[k] > 0 : r[k] < 0) ? "bad" : "";
+  sortableTable("nodes", [
+    { k: "id", h: "node", f: (r) => `${r.id} <span class="tag">${r.status}</span>` },
+    { k: "layer", h: "layer" },
+    { k: "loc", h: "loc" },
+    { k: "d_loc", h: "\u0394loc", f: delta("d_loc") },
+    { k: "ca", h: "ca", t: "fan-in" },
+    { k: "d_ca", h: "\u0394ca", t: "change in fan-in", f: delta("d_ca"), flag: flag("d_ca", "up") },
+    { k: "ce", h: "ce", t: "fan-out" },
+    { k: "d_ce", h: "\u0394ce", f: delta("d_ce") },
+    { k: "i", h: "i", t: "instability", f: (r) => r.i.toFixed(2) },
+    { k: "cc_max", h: "cc", flag: (r) => r.cc_max >= 20 ? "worst" : r.cc_max >= 11 ? "bad" : "" },
+    { k: "d_cc_max", h: "\u0394cc", f: delta("d_cc_max"), flag: flag("d_cc_max", "up") },
+    { k: "mi", h: "mi", f: (r) => r.mi.toFixed(0), flag: (r) => r.mi < 65 ? "bad" : "" },
+    { k: "d_mi", h: "\u0394mi", f: delta("d_mi"), flag: flag("d_mi", "down") },
+  ], rows, "d_loc");
+  if (!rows.length) $("nodes").insertAdjacentHTML("afterend",
+    '<p class="empty" style="padding:.8rem">No analysed module was added or touched.</p>');
+})();
+
+/* ----------------------------------------------------------- file table */
+(function fileTable() {
+  sortableTable("files", [
+    { k: "path", h: "file", f: (r) => (r.test ? '<span class="tag">T</span> ' : "") + r.path },
+    { k: "status", h: "s", t: "A added, M modified" },
+    { k: "node", h: "node" },
+    { k: "score", h: "score", t: "churn x complexity", f: (r) => r.score.toFixed(3) },
+    { k: "churn", h: "churn" },
+    { k: "cc_max", h: "cc", flag: (r) => r.cc_max >= 20 ? "worst" : r.cc_max >= 11 ? "bad" : "" },
+    { k: "mi", h: "mi", f: (r) => r.mi.toFixed(0), flag: (r) => r.mi < 65 ? "bad" : "" },
+    { k: "loc", h: "loc" },
+    { k: "authors", h: "auth" },
+  ], DATA.changed, "score");
+})();
+
+scheduleRenders([Graph, Matrix]);
+</script>
+</body>
+</html>
