@@ -17,4 +17,4 @@ The Heimspiel stadium-change relaunch (`_relaunch_after_stadium_update`) is a di
 it acts only on POST_MATCH matches, uses `requester='stadium_update'`, and calls the lambda directly.
 
 Fix (2026-10-01): wilson !2664 makes the dimensions relaunch and `set_matches_to_retry_online` skip or refuse future matches.
-football !1575 makes the cron set `active=False` for a future match and return without launching. Raising would keep it active.
+football !1575 makes the cron skip a future match: it returns without launching, and the row stays in the pool.
