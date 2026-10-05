@@ -11,6 +11,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 ## data-provider-clients
 
 - [Heimspiel extra time & penalty shootouts](docs/heimspiel-extra-time-and-penalties.md) — how the Heimspiel client models knockout matches past 90'; two data sources (result periods + events) needed together
+- [Heimspiel placeholder teams](docs/heimspiel-placeholder-teams.md) — `show_team: "no"` → `Team.is_placeholder`; CE match creation skips them silently (dpc !42, wilson !2681)
 
 ## football-metadata-service
 
