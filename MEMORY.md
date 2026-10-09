@@ -19,6 +19,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [kubectl guide](docs/football-metadata-service-kubectl.html) — operational kubectl commands for the football-metadata-service cluster
 
 ## wilson
+- [NCAA lineups vs Heimspiel](docs/ncaa-lineups-vs-heimspiel.md) — read-only `evaluate_ncaa_lineups` command (unmerged branch); mapping, minute and position conventions
 - [Match uniqueness window](docs/match-uniqueness-window.md) — duplicate guard for Gaffer/Forest/merge_teams: ±24h home/away pair (was 12h), wilson !2695
 
 - [son schema changes vs football lambdas](docs/son-schema-changes-break-football-lambdas.md) — dropping a son column breaks football + wilson lambdas on older son (they SELECT every declared column); who loads Player, pirlo prerelease relock flow, rollout order
