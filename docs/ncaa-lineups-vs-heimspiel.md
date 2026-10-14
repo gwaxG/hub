@@ -11,7 +11,10 @@ Notion task 856 "Evaluate lineups from NCAA").
   else `hs-<id>` (unmapped).
 - Minutes: ours = period start + `(frame - period start) // (VIDEO_FPS*60)`; Heimspiel = period offset
   (0/45/90/105) + `start_minute` — same convention as wilson's Heimspiel event ingestion.
-- Positions compared on `PositionGroup` (Heimspiel labels are coarse: `CD` → CB, `FW` → CF).
+- Positions: Heimspiel `match_team[].tactical_formation_id` + `tactical[].pos_index` → `skc_position` via
+  `heimspiel_formations.csv` (next to the command) gives LCB/RCB etc.; fallback to the coarse shortname (`CD` → CB).
+  `position_ok` = exact acronym, `position_group_ok` = `PositionGroup`. NCAA CEs had no tactical data at all
+  (2026-10-13, 132 finished matches); dpc common models drop `pos_index`/formation id, so the command reads the raw `get_match`.
 - Subs paired by (team, player in, player out), closest minute; per-player in/out minutes give a
   pairing-agnostic check for mass substitutions / re-entries.
 - Output: `ncaa_lineups_statistics.csv` (scopes: all, per CE, per gender), `ncaa_lineups_matches.csv`,
