@@ -19,6 +19,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [kubectl guide](docs/football-metadata-service-kubectl.html) — operational kubectl commands for the football-metadata-service cluster
 
 ## wilson
+- [Physical → ClickHouse ingestion & serving](docs/physical-clickhouse-ingestion-and-serving.md) — /api/physical/ served from CH (wilson 6476f9e94, ClickPipe-scoped CTEs); football → S3 → icebergkamp hourly Glue → wemby refreshable MV → physical_3_0_x_new; ClickPipe not in any repo
 - [NCAA lineups vs Heimspiel](docs/ncaa-lineups-vs-heimspiel.md) — read-only `evaluate_ncaa_lineups` command (unmerged branch); mapping, minute and position conventions
 - [Match uniqueness window](docs/match-uniqueness-window.md) — duplicate guard for Gaffer/Forest/merge_teams: ±24h home/away pair (was 12h), wilson !2695
 
