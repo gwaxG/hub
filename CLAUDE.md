@@ -37,8 +37,21 @@ default branch unless explicitly told to.
 ## Memory — the `docs/` file lake
 
 Durable project knowledge lives as a flat **file lake**: `docs/` holds one
-Markdown file per note and nothing else — no subfolders, no automation, no
-schema. Write a note as `docs/<slug>.md`; keep it current by hand.
+Markdown file per note and nothing else — no subfolders. Write a note as
+`docs/<slug>.md`, starting with this frontmatter:
+
+```
+---
+repo: [wilson, football]        # repos/systems the note is about (hub for the hub)
+mr: [wilson!2664, football!1575] # MRs it describes, [] if none
+verified_at: 2026-10-30          # last date checked against source
+---
+```
+
+Optional `source:` holds Slack/Notion permalinks. Bump `verified_at` whenever you
+re-check a note against code. `uv run workflows/lint_docs.py` checks frontmatter,
+dead links, orphans (files missing from `MEMORY.md`) and stale notes (>90 days);
+run it after every docs change — errors must be zero.
 
 Root `MEMORY.md` is the index: one line per file (`[title](docs/slug.md) —
 hook`), grouped by system. It is hand-maintained — when you add, rename, or
@@ -56,6 +69,12 @@ Write memory files into /docs in cases when:
   (1) you discover new things about existing codebase like behaviour, workflows etc;
   (2) you implement something new in codebase like features, workflows etc.
 Remove or modify obsolete files if they do not correspond to the reality.
+
+Ingestion paths: by hand while working; the Stop hook
+(`.claude/hooks/docs_nudge.py`) asks once per session to record learnings when
+work happened but `docs/` wasn't touched; `/hub-distill` batch-promotes
+claude-mem history and auto-memory project notes; `hub-slack-ingest` files
+durable facts whenever the user asks about Slack.
 
 ## Secrets
 

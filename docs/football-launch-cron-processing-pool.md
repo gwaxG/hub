@@ -1,3 +1,9 @@
+---
+repo: [wilson, football]
+mr: [wilson!2664, football!1575]
+verified_at: 2026-10-01
+---
+
 # Football launch cron and the processing pool
 
 `football-launch_football_pipeline-<env>` (football repo, `pulumi/aws/standalone/launch_football_pipeline`)

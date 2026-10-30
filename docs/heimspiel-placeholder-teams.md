@@ -1,3 +1,9 @@
+---
+repo: [data-provider-clients, wilson]
+mr: [data-provider-clients!44, wilson!2681]
+verified_at: 2026-10-09
+---
+
 # Heimspiel placeholder teams
 
 Heimspiel lists knockout fixtures before teams are known ("Winner Group B"). Such teams carry

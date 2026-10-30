@@ -1,3 +1,9 @@
+---
+repo: [wilson, football, vidic]
+mr: []
+verified_at: 2026-09-29
+---
+
 # `No video on S3` for a match copied to dev
 
 ## Symptom

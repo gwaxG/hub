@@ -1,3 +1,9 @@
+---
+repo: [hub]
+mr: []
+verified_at: 2026-09-29
+---
+
 # hub-graph / hub-mr — code graph & integration reports
 
 Two skills over one engine, both producing a self-contained HTML report in

@@ -1,3 +1,9 @@
+---
+repo: [wilson]
+mr: []
+verified_at: 2026-10-14
+---
+
 # NCAA lineups vs Heimspiel evaluation
 
 Read-only wilson command `evaluate_ncaa_lineups` (branch `feat/evaluate-ncaa-lineups`, not meant to be merged;

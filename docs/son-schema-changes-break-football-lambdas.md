@@ -1,3 +1,9 @@
+---
+repo: [son, wilson, football]
+mr: [football!1552, wilson!2623, wilson!2625]
+verified_at: 2026-09-22
+---
+
 # son schema changes vs football lambdas
 
 Dropping (or renaming) a column on a son model is a cross-repo change: every

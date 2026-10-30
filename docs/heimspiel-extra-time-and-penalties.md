@@ -1,9 +1,7 @@
 ---
-title: Heimspiel extra time & penalty shootouts
-type: interface
-status: current
-systems: [data-provider-clients]
-last_verified: 2026-07-17
+repo: [data-provider-clients]
+mr: []
+verified_at: 2026-07-17
 ---
 
 # Heimspiel: extra time & penalty shootouts
