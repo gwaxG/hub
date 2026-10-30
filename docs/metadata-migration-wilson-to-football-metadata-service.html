@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metadata migration — wilson → football-metadata-service</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --deep-black:#001200; --dark-green:#004812; --forest:#006A26;
+    --brand-green:#158158; --bright:#00C800; --neon:#32FE6B; --lime:#C8FF6A;
+    --white:#FFFFFF; --muted:#9E9E9E; --tint:#0B3F1B;
+    --wilson:#0C5A24; --wilson-line:#1e8a41; --native:#0d2c17;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Trebuchet MS",Barlow,sans-serif;
+    color:var(--white);
+    background:linear-gradient(160deg,#004812 0%,#001200 82%,#001200 100%);
+    min-height:100vh; padding:48px 32px 64px; line-height:1.55;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  h1,h2,h3,.caps{font-family:"Chakra Petch",sans-serif;text-transform:uppercase;letter-spacing:.02em}
+  header.bar{border-bottom:1px solid rgba(255,255,255,.35);padding-bottom:14px;margin-bottom:8px;
+    display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  header.bar h1{font-size:30px;font-weight:700;color:var(--white)}
+  header.bar .sub{font-family:"Chakra Petch",sans-serif;font-style:italic;text-transform:uppercase;
+    color:var(--lime);font-size:15px;margin-top:4px;letter-spacing:.03em}
+  .wordmark{font-family:"Chakra Petch",sans-serif;font-size:15px;letter-spacing:.08em;white-space:nowrap}
+  .wordmark b{font-weight:700}
+  .wordmark span{font-weight:400;text-transform:lowercase}
+
+  .decisions{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0 6px}
+  .pill{display:flex;flex-direction:column;gap:2px;border:1px solid var(--neon);border-radius:12px;
+    padding:10px 16px;min-width:220px;flex:1}
+  .pill .k{font-family:"Chakra Petch",sans-serif;text-transform:uppercase;font-size:11px;color:var(--neon);letter-spacing:.06em}
+  .pill .v{font-size:14px;color:var(--white)}
+
+  h2.section{font-size:16px;font-weight:600;color:var(--neon);margin:38px 0 14px;
+    border-left:3px solid var(--neon);padding-left:10px}
+
+  .path{display:flex;align-items:center;gap:0;flex-wrap:wrap}
+  .node{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.4);border-radius:10px;
+    padding:14px 18px;font-family:"Chakra Petch",sans-serif;text-transform:uppercase;font-size:13px;
+    font-weight:500;text-align:center;min-width:150px}
+  .arrow{color:var(--neon);font-size:22px;padding:0 12px;font-family:"Chakra Petch",sans-serif}
+  .path .note{color:var(--muted);font-size:12px;margin-left:14px;font-style:italic}
+
+  .phases{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+  .phase{display:grid;grid-template-columns:96px 1fr;gap:20px;align-items:stretch;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:18px 20px}
+  .phase .num{font-family:"Chakra Petch",sans-serif;font-style:italic;font-weight:700;font-size:52px;
+    color:var(--lime);line-height:.9;opacity:.9}
+  .phase .num small{display:block;font-style:normal;font-weight:500;font-size:11px;color:var(--neon);
+    letter-spacing:.05em;margin-top:6px}
+  .phase h3{font-size:15px;font-weight:600;color:var(--white);margin-bottom:8px}
+  .phase p{font-size:13.5px;color:#e6f2e9;margin-bottom:10px}
+  .phase ul{margin:0 0 10px 18px}
+  .phase li{font-size:13px;color:#d7e7dc;margin-bottom:3px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .chip{display:flex;align-items:center;gap:8px;border-radius:9px;padding:9px 14px;font-size:12.5px;
+    font-family:"Chakra Petch",sans-serif;text-transform:uppercase;letter-spacing:.02em}
+  .chip.wilson{background:var(--wilson);border:1px solid var(--wilson-line);color:#eafff0}
+  .chip.native{background:var(--native);border:1px solid var(--neon);color:var(--neon)}
+  .chip.dashed{border-style:dashed;opacity:.85}
+  .chip .dot{width:9px;height:9px;border-radius:50%}
+  .chip.wilson .dot{background:var(--wilson-line)}
+  .chip.native .dot{background:var(--neon)}
+  .flow{color:var(--muted);font-size:18px;align-self:center}
+
+  .callout{border:1px solid var(--neon);border-radius:14px;padding:18px 22px;margin-top:8px}
+  .callout h3{font-family:"Chakra Petch",sans-serif;text-transform:uppercase;color:var(--neon);
+    font-size:15px;font-weight:700;margin-bottom:12px}
+  .callout ul{list-style:none}
+  .callout li{position:relative;padding-left:20px;font-size:13.5px;margin-bottom:9px;color:#e6f2e9}
+  .callout li::before{content:"\25CF";position:absolute;left:0;color:var(--muted);font-size:10px;top:3px}
+  .callout li b{color:var(--lime);font-weight:700}
+
+  .legend{display:flex;gap:26px;flex-wrap:wrap;margin-top:22px;padding-top:16px;
+    border-top:1px solid rgba(255,255,255,.2);font-size:12.5px;color:var(--muted)}
+  .legend .item{display:flex;align-items:center;gap:9px}
+  .legend .sw{width:16px;height:16px;border-radius:4px}
+  .legend .sw.wilson{background:var(--wilson);border:1px solid var(--wilson-line)}
+  .legend .sw.native{background:var(--native);border:1px solid var(--neon)}
+  footer{margin-top:30px;font-size:11.5px;color:var(--muted);font-style:italic}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="bar">
+    <div>
+      <h1>Metadata migration</h1>
+      <div class="sub">wilson &rarr; football-metadata-service &nbsp;&middot;&nbsp; read-only strangler fig</div>
+    </div>
+    <div class="wordmark"><b>SKILL</b><span>corner</span></div>
+  </header>
+
+  <div class="decisions">
+    <div class="pill"><span class="k">Storage</span><span class="v">son facade now &rarr; dedicated DB later</span></div>
+    <div class="pill"><span class="k">Write authority</span><span class="v">new service read-only &middot; wilson stays sole writer</span></div>
+    <div class="pill"><span class="k">Scope</span><span class="v">reference data + Match / lineups</span></div>
+  </div>
+
+  <h2 class="section">Request path &middot; read-only</h2>
+  <div class="path">
+    <div class="node">Clients</div>
+    <div class="arrow">&rarr;</div>
+    <div class="node">Envoy gateway</div>
+    <div class="arrow">&rarr;</div>
+    <div class="node">football-metadata-service<br>(FastAPI)</div>
+    <div class="note">the contract never changes — only each entity's backing store moves</div>
+  </div>
+
+  <h2 class="section">Backing store &middot; phase by phase</h2>
+  <div class="phases">
+
+    <div class="phase">
+      <div class="num">1<small>SON FACADE</small></div>
+      <div>
+        <h3>son-backed read facade</h3>
+        <p>New service exposes the clean API immediately, reading wilson's live DB through <code>son</code> (Django ORM) &mdash; all wilson invariants preserved, nothing written.</p>
+        <div class="chips">
+          <span class="chip wilson"><span class="dot"></span>wilson Aurora &middot; read via son</span>
+          <span class="flow">&larr;</span>
+          <span class="chip native dashed"><span class="dot"></span>dedicated DB &middot; empty for now</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="num">2<small>CUTOVER</small></div>
+      <div>
+        <h3>client cutover at the gateway</h3>
+        <p>Route metadata reads through Envoy to the new service, endpoint by endpoint. Same data, still served from wilson via son. Contract-parity diffing gates each move.</p>
+        <div class="chips">
+          <span class="chip wilson"><span class="dot"></span>wilson Aurora &middot; via son</span>
+          <span class="chip native dashed" style="border-color:var(--muted);color:var(--muted)"><span class="dot" style="background:var(--muted)"></span>clients now hit new API</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="num">3<small>MIGRATE STORE</small></div>
+      <div>
+        <h3>per-entity storage migration</h3>
+        <p>Model each entity natively in SQLModel, backfill + nightly one-directional sync from wilson, flip its <code>source</code> flag once native-vs-son parity holds. Reference data first, Match / lineups last.</p>
+        <div class="chips">
+          <span class="chip native"><span class="dot"></span>dedicated DB &middot; reference data</span>
+          <span class="flow">&larr; sync &larr;</span>
+          <span class="chip wilson"><span class="dot"></span>wilson &middot; Match/lineups still via son</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="num">4<small>END STATE</small></div>
+      <div>
+        <h3>facade removed</h3>
+        <p>All in-scope entities served from the dedicated DB. <code>son</code> dependency dropped. Wilson keeps writing and feeds the nightly sync only. Moving write authority is a future, separate project.</p>
+        <div class="chips">
+          <span class="chip native"><span class="dot"></span>dedicated DB &middot; all entities</span>
+          <span class="flow">&larr; sync &larr;</span>
+          <span class="chip wilson dashed"><span class="dot"></span>wilson &middot; feeds sync only</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="section">What changed vs the original 7-step plan</h2>
+  <div class="callout">
+    <h3>Corrections from reading the code</h3>
+    <ul>
+      <li><b>Dropped the SQLModel-on-wilson's-tables layer.</b> <code>son</code> already gives Django-ORM access to wilson's live DB in production &mdash; no translation layer to build.</li>
+      <li><b>Removed direct writes to wilson.</b> A foreign ORM would bypass Django signals, custom <code>save()</code> (auto-created run-parameters, DataCollection, 12h uniqueness) and auto timestamps. Read-only sidesteps all of it.</li>
+      <li><b>No DB "recreation".</b> The service already has a redesigned provider-scoped schema (ADR 0002); the endgame is a synced dedicated DB, not a rebuild.</li>
+      <li><b>wilson maps into the identity model</b> as <code>provider='wilson'</code>, preserving wilson-PK &harr; new-PK.</li>
+      <li><b>Two early risks:</b> son (Django 4.2, &le; Py 3.12) inside a Py 3.13 async service &mdash; confirm or isolate; and Pulumi work to grant read access + network reach to wilson's Aurora.</li>
+    </ul>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="sw wilson"></span>served from wilson (via son)</div>
+    <div class="item"><span class="sw native"></span>served from dedicated DB (native SQLModel)</div>
+    <div class="item">dashed = not yet active / sync-only</div>
+  </div>
+
+  <footer>Schematic for planning discussion &middot; generated for the wilson &rarr; football-metadata-service metadata migration.</footer>
+
+</div>
+</body>
+</html>
