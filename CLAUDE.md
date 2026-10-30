@@ -74,8 +74,10 @@ Write memory files into /docs in cases when:
 Remove or modify obsolete files if they do not correspond to the reality.
 
 Ingestion paths: by hand while working; the Stop hook
-(`.claude/hooks/docs_nudge.py`) asks once per session to record learnings when
-work happened but `docs/` wasn't touched; `/hub-distill` batch-promotes
+(`.claude/hooks/docs_nudge.py`) asks to record learnings at the end of a turn
+when the work since its last nudge was costly (code edits, commits or MR calls;
+or an investigation of 25+ tool calls, a subagent, or 20+ minutes) and wrote
+nothing to `docs/`; `/hub-distill` batch-promotes
 claude-mem history and auto-memory project notes; `hub-slack-ingest` files
 durable facts whenever the user asks about Slack.
 
