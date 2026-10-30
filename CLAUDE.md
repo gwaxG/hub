@@ -64,7 +64,10 @@ The vault is a best-effort snapshot, **not authoritative** — verify against
 current source before trusting a note. (`claude-mem` separately keeps automatic
 episodic session history; don't duplicate that here.)
 
-Inject MEMORY.md in the sesion context at the beginning of every session.
+The index is imported below, so every hub session starts with it loaded:
+
+@MEMORY.md
+
 Write memory files into /docs in cases when:
   (1) you discover new things about existing codebase like behaviour, workflows etc;
   (2) you implement something new in codebase like features, workflows etc.
