@@ -10,8 +10,11 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
     swaps the `other` stack name for the custom one (`paulumi.py` `_handle_other_stack`).
   - `destroy --env X` has no `--stack-name`; the env *is* the stack. `--force` also deletes data buckets.
   - `deploy --force` overrides another pipeline's env lock.
-- **DB topology**: a custom wilson stack gets its own DB; custom football stacks use the dev DB. That's why
-  wilson + football features are validated together on `dev` or `staging`.
+- **DB topology**: a custom wilson stack gets its own DB; custom football stacks use the dev DB.
+- **Env rule**: every project deploys to its own `mr_<iid>` stack, wilson included. Wilson goes to `dev` only when the
+  ticket needs a football pipeline run (football's `mr_<iid>` reads the dev DB). Before deploying to dev, check it with
+  `pirlo status`. If it's occupied by an unmerged branch (the usual case), ask first; if it's empty or holds merged
+  code, deploy.
 - **francli** `football run|status --env`: an enum loaded from francli config. It includes `dev`, `staging`, `prod`
   and personal stacks (e.g. `andrei`). A brand-new stack name may be missing until francli config lists it.
   Success criterion used by the team: the main football pipeline SFN is all green for the finished match.
