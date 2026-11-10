@@ -7,6 +7,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 ## hub
 
 - [hub-graph / hub-mr code graph tools](docs/hub-graph-code-graph-tool.md) — `hub-graph` (whole repo) + `hub-mr` (feature integration vs merge base) over one shared engine; artefacts in `hub/tmp`; the sys.path-root, topological-order and base-comparability traps
+- [pirlo + francli dev loop](docs/pirlo-francli-dev-loop.md) — prerelease → pin → deploy (custom stack vs dev/staging) → francli pipeline green → destroy; custom-stack mechanics and DB topology
 
 ## data-provider-clients
 
