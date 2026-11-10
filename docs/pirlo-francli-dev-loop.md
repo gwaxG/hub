@@ -18,6 +18,12 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
 - **francli** `football run|status --env`: an enum loaded from francli config. It includes `dev`, `staging`, `prod`
   and personal stacks (e.g. `andrei`). A brand-new stack name may be missing until francli config lists it.
   Success criterion used by the team: the main football pipeline SFN is all green for the finished match.
+- **Missing files on dev** (a QA failure caused by the environment, not the change): `s3-copy <preset> --destination-env dev
+  --matches <ids>`, from GitLab project `skillcorner/shared/migrate-and-copy`. It invokes the prod lambda
+  `wilson-data_copy_tool-prod` (eu-central-1). Presets: match-infos, tracking-extrapolated, physical,
+  physical-v301, dynamic-events, gi-*, copy-gt; or `no-preset --skcr-keys BUCKET:PATH`. It never copies to prod.
+  `francli football tools migrate-and-copy` is a stub (`NotImplementedError`). For video, see
+  `no-video-on-s3-on-dev.md`.
 - **QA agents** (global, `~/.claude/agents/`): `qa-planner` turns a diff into `plan.yaml` (http / lambda / pipeline
   steps with oracles; matches from recent green dev runs). `qa/qa_run.py` (PEP 723 script, tests in
   `qa/test_qa_run.py`) executes it deterministically. Before running, it checks the pirlo env git tag (`refs/tags/<env>`,

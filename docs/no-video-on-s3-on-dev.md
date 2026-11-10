@@ -50,8 +50,9 @@ prod video *is* reachable from dev once the row exists.
 1. Recreate the `Video` row on dev (provider + feed type copied from prod), e.g.
    `Video.objects.create(match_id=..., provider=..., video_feed_type=..., vidic_version='v2', status='done', fps=10)`,
    then relaunch. The check then queries Vidic prod and passes.
-2. Legacy/custom-video matches only: copy the mp4 explicitly —
-   `no-preset --destination-env dev --matches <id> --skcr-keys "skcr-algo:prod/<MATCH_NAME>/<MATCH_NAME>.mp4"`.
+2. Legacy/custom-video matches only: copy the mp4 explicitly with `s3-copy` (GitLab project
+   `skillcorner/shared/migrate-and-copy`) —
+   `s3-copy no-preset --destination-env dev --matches <id> --skcr-keys "skcr-algo:prod/<MATCH_NAME>/<MATCH_NAME>.mp4"`.
 
 **Do not** use the Forest *Add video* / *Replace video* actions on dev: they call
 `vidic_client.import_video` / `create_video` / `video_set_status` against **Vidic
