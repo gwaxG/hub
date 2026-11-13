@@ -1,0 +1,1 @@
+{ "name": "work-monitor", "version": "0.1.0", "description": "Pane listing running Claude sessions, active GitLab CI pipelines and open merge requests", "types": "./types/index.d.ts" }

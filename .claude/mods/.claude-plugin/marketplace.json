@@ -1,0 +1,5 @@
+{
+  "name": "local-mods",
+  "owner": { "name": "Andrei" },
+  "plugins": [{ "name": "work-monitor", "source": "./work-monitor" }]
+}
