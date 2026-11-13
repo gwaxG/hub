@@ -21,5 +21,7 @@ verified_at: 2026-11-13
   wilson relaunch / `dynamic_events_epv_historical_recompute` start it without any check → keep a DB fallback.
 - Same async-write pattern, lower risk (larger gap): `get_gi_quality_index` reads
   `tracking_extra_v3_*_quality_index`; `get_shot_goal_synchro_details` reads `gi_*_event_provider_used`.
-- Fix in progress: football branch `fix/gi-check-race-dynamic-events-agg` — pass `gi_check_passed` through the
-  SFNs, lambdas fall back to the DB when absent. Related: [GI v3 skip path](gi-v3-core-events-skipped-stale-gi.md).
+- Fix: football !1734 (`fix/gi-check-race-dynamic-events-agg`) — minutes SFN outputs `{gi_check_passed}` (QC
+  `dynamic_events_v3_check`, null when skipped) → GI v3/main pass it to dynamic_events_agg (optional input, Choice
+  IsPresent) → lambdas use it, else the DB. QA on mr-1734, match 2261 with DB forced False: outputs True 28/28.
+  Backfill since 2026-09-14 still to do after merge. Related: [GI v3 skip path](gi-v3-core-events-skipped-stale-gi.md).

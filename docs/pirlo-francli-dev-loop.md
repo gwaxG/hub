@@ -37,3 +37,11 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
   `qa/test_qa_run.py`) executes it deterministically. Before running, it checks the pirlo env git tag (`refs/tags/<env>`,
   moved by the deploy pipeline's `update_tag` stage) equals the branch head. It polls
   `francli football status --format json` (`pipeline_status`, `processed_at`). `qa-verifier` judges the results and posts a short MR note.
+- **Custom stack name gotchas** (2026-11-13, football !1734): pirlo rejects `mr_<iid>` (lowercase, digits, interior
+  hyphens only) → the stack is `mr-<iid>`. francli then rejects `--env mr-<iid>` (its env enum is parsed from
+  `football-<name>-<env>` lambda names with exactly one hyphen), and qa_run.py `pipeline` only runs the main SFN, so
+  SFN scenarios on such a stack run manually via `aws stepfunctions start-execution` (`skip_list` takes full SFN names
+  incl. the `-mr-<iid>` suffix). The mr stack's lambdas read the dev DB (`WILSON_DB_ENV=dev`), write the dev S3 buckets,
+  never send to maldini, and its `football-domain-events-mr-<iid>` SNS topic has no subscribers (no async DB writes).
+  A DB check can be forced on dev by invoking `wilson-apply_domain_events-dev` (eu-central-1) with an SQS-shaped
+  domain event; restore with a later `occurred_at`. Run pirlo with `uvx --python 3.13` (3.14t fails building orjson).
