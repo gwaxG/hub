@@ -1,7 +1,7 @@
 ---
 repo: [wilson, data-provider-clients]
-mr: []
-verified_at: 2026-10-12
+mr: [wilson!2540]
+verified_at: 2026-11-03
 ---
 
 # Match Creation Workflow
@@ -63,10 +63,10 @@ An admin selects a `CompetitionEditionBeating` record and clicks "Activate auto 
 
 ### 2. Scheduled Execution (Lambda + task-by-row)
 
-A Lambda function (`wilson-create_matches_from_provider_for_c-{ENV}`) runs periodically.
+A Lambda function (`wilson-create_matches_from_provider_for_c-{ENV}`; Heimspiel: `wilson-create_matches_from_heimspiel_for_-{ENV}`) runs every few minutes via EventBridge (prod/teamapp only — `ENABLE_EVENT_BRIDGE` in `pulumi/02_compute/wilson.py`).
 
 The `@task_by_row_v2` decorator:
-- Picks the next `CompetitionEdition` where `active = True`
+- Picks the `CompetitionEdition` with the oldest `last_try` (nulls first) where `active = True`, or exactly the one given as `{"competitionedition_id": id}` in the event
 - Respects a **3-hour retry delay** between attempts
 - Enforces a **30-minute timeout** per execution
 - Tracks `started_at` and `last_try` on `CompetitionEditionBeating`
@@ -115,7 +115,7 @@ Handled by `MatchProviderManager.create()` in `server/son/models/match_provider_
 
 ### Status Tracking
 
-Each step tracks progress on `MatchCreationStatus` across 5 dimensions:
+Each step tracks progress on `MatchCreationStatus` (one row per provider + provider match id; no FK to Match — join through `MatchMatching`) across 6 dimensions:
 
 | Dimension              | Description              |
 |------------------------|--------------------------|
@@ -124,10 +124,37 @@ Each step tracks progress on `MatchCreationStatus` across 5 dimensions:
 | `status_lineup_events` | Match events import      |
 | `status_video`         | Video download           |
 | `status_period_events` | Game period creation     |
+| `status_vidic_events`  | Periods + instructions pushed to the Vidic video |
 
-Each can be: `TO_CREATE`, `DONE`, `ERROR`, or `IGNORED`.
+Values: `to_create`, `done`, `error`, `ignored`, `not_available` (`son/models/match_creation_status.py`).
+`ignored` usually means another provider/operator owns that data; lineup steps carry a reason in
+`error_lineup.error_details.reason` (`existing_lineup_kept`, `own_lineup_kept`) since wilson !2540.
+`not_available` = the provider can't supply it (Heimspiel has no video/periods).
 
-If a match was partially created before, only the missing steps run on the next attempt.
+If a match was partially created before, only the missing steps run on the next attempt: an
+existing match is re-visited only while `MatchCompletion.is_fully_created` is False
+(`son/match_completion.py`), and protected matches (`Match.is_match_protected_from_overwrite`:
+post-match, home-team-side check, preprod done) are skipped with MCS `ignored`.
+
+---
+
+## Several providers on one match (Heimspiel + video provider)
+
+- `PROVIDERS_WITH_VIDEO = {SICS, SMRT_STATS}` supply video + periods; `METADATA_ONLY_PROVIDERS =
+  {HEIMSPIEL}` supplies match info, and optionally lineups + subs/red cards. Each provider has its
+  own CE cron lambda and its own MCS row for the same match.
+- Heimspiel can create the match (`create_matches_from_heimspiel_active`); the video provider then
+  finds it (search MATCHED/FOUND) and fills video + periods.
+- Lineups/instructions come from exactly one source per match, chosen per CE by
+  `create_lineups_from_heimspiel` and then frozen by `data_collection.lineup_provider` — details in
+  [heimspiel-lineups-wilson-flow](heimspiel-lineups-wilson-flow.md).
+- Operator edits (Gaffer/Forest) set `lineup_provider`/`period_frame_provider = 'skillcorner'`;
+  `TeamPlayerMatch` writes on a `skillcorner` lineup raise `ProtectedLineupException` unless
+  `overwrite_manual_data=True`.
+- Last step of each pass: `push_events_to_vidic` (video provider only; Heimspiel just flags
+  `status_vidic_events = to_create`).
+- Testing on dev (crons off, manual invoke with `competitionedition_id`, dev writes prod Vidic):
+  [match-creation-dev-validation](match-creation-dev-validation.md).
 
 ### Error Types
 

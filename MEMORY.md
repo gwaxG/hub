@@ -14,6 +14,10 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Infra team regular work](docs/infra-team-regular-work.md) — 6-month MR analysis of the 4 infra engineers: IAM tickets ~31%, Cognito, capacity tuning
 - [Notion All Tasks ticket runbook](docs/notion-tasks-ticket-runbook.md) — data source id, user id, Done-date automation overwrites backdating, Slack link rule
 
+## kickoff
+
+- [kickoff /metrics multi-worker bug](docs/kickoff-prometheus-multiworker-metrics.md) — uvicorn 4 workers = per-process counters → fake resets; fix = PROMETHEUS_MULTIPROC_DIR + MultiProcessCollector (kickoff!125), per-service hand MRs
+
 ## data-provider-clients
 
 - [Heimspiel implementation overview](docs/heimspiel-implementation-overview.md) — Heimspiel as secondary metadata provider in wilson (no video): pipeline alongside SICS/SmrtStats (Apr 2026 snapshot)
@@ -37,7 +41,8 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 
 ## wilson
 
-- [Physical v3/v4 flow: football → Icebergkamp → ClickHouse → wilson](docs/physical-v4-icebergkamp-flow.md) — S3→EventBridge→SQS→SFN→Glue→Iceberg→CH refresh; v3 statuses via 5-min sync task; v4 not served (CH reads dev snapshot); 2026-11-04 backfill backlog runbook; wilson domain-events filter allowlist (!2838) silently drops unlisted events — verify physical.loaded positively, not via empty DLQ
+- [Wilson Cognito JIT migration](docs/wilson-cognito-jit-migration.md) — verify-credentials + lookup-user (X-Migration-Key, prod-only key); exact username vs iexact login
+- [Physical v3/v4 flow: football → Icebergkamp → ClickHouse → wilson](docs/physical-v4-icebergkamp-flow.md) — S3→EventBridge→SQS→SFN→Glue→Iceberg→CH refresh; v3 statuses via 5-min sync task; v4 not served (CH reads dev snapshot); 2026-11-04 backfill backlog runbook; wilson domain-events filter allowlist (!2838) silently drops unlisted events — verify physical.loaded positively, not via empty DLQ; v4 DC columns + mapping in !2858
 - [Match creation workflow](docs/match-creation-workflow.md) — provider match creation: Forest Admin activation → task-by-row scheduler → provider clients; MCS statuses, completeness re-runs, Heimspiel + video provider on one match
 - [Heimspiel lineups in wilson](docs/heimspiel-lineups-wilson-flow.md) — !2540 merged (son 0.91.0): per-CE lineup source frozen by lineup_provider, ignored+reason statuses, operator lineups, inline HS subs, Vidic push + count-only gap, AddField relock trap
 - [Validating match creation on dev](docs/match-creation-dev-validation.md) — dev crons off → invoke with {"competitionedition_id"}, dev writes prod Vidic, make matches incomplete to re-run, capture Vidic payload without writing

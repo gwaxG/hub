@@ -1,7 +1,7 @@
 ---
 repo: [data-provider-clients, wilson]
 mr: [data-provider-clients!34, data-provider-clients!48, wilson!2540]
-verified_at: 2026-10-20
+verified_at: 2026-11-12
 ---
 
 # Heimspiel lineup & instruction ingestion (task 807)
@@ -25,5 +25,15 @@ Spec: Notion "Lineup and instruction ingestion from Heimspiel" (rewritten 2026-1
 ## History
 - dpc !34 (`feat/heimspiel-lineup-events`, old spec: drop minute-only events) landed on main as
   b1151cc (1.15.0) although the MR shows "closed".
-- wilson !2540 (`feat/lineups-events`, draft) still pins dpc 1.14.1; needs 1.16.0, must not
-  expect Heimspiel goals (son raises `UnhandledProviderEvent` on yellow cards).
+- wilson !2540 merged 2026-11-03 (squash `0c54f47c5`, son 0.91.0, dpc 1.16.3) — wilson-side
+  behaviour in [heimspiel-lineups-wilson-flow](heimspiel-lineups-wilson-flow.md).
+
+## Open: minute-only matches → "Instructions timestamps review" (task 4059, To Do)
+Source: Slack https://skillcorner.slack.com/archives/C04GQ2WFH6V/p1794496554241369 (2026-11-12).
+- Problem: since dpc 1.16, a minute-only sub/red card is placed at `minute-1`:00, which can't be told apart
+  from an exact time (`Approximate Time` is set only on a capped period end, and wilson never reads it).
+- Options: A = keep the time + tag every rounded event `Approximate Time` and store the tag in wilson;
+  B (Marthe's preference) = create the event with no frame, so it isn't pushed to Vidic and launch stays blocked until the operator re-times it,
+  and re-ingestion must not overwrite that work. Both need dpc to tag all non-`time` events.
+- Ticket flow: the match skips the Home Team Side queue, and the operator fixes the timestamps, sets the HTS and launches it from the match page,
+  so the HTS check still happens. The billing count (does it count like HTSV?) is still open, per Slack.

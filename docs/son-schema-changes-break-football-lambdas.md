@@ -1,7 +1,7 @@
 ---
 repo: [son, wilson, football]
-mr: [football!1552, wilson!2623, wilson!2625]
-verified_at: 2026-09-22
+mr: [football!1552, wilson!2623, wilson!2625, wilson!2540]
+verified_at: 2026-11-03
 ---
 
 # son schema changes vs football lambdas
@@ -11,6 +11,14 @@ son consumer that loads that model on an **older** son still declares the
 field, and Django `SELECT`s every concrete column, so the query fails with
 `column api_<table>.<field> does not exist` as soon as the wilson migration
 runs.
+
+Adding a column breaks the other direction: `AddField(..., default=X)` without `db_default`
+creates a `NOT NULL` column with no DB default, so an older son that **INSERTs** that model fails
+with `IntegrityError` (reads and updates of known columns keep working). Hit for
+`CompetitionEditionBeating.create_lineups_from_heimspiel` (wilson !2540): every
+`task_by_row_v2(Model=CompetitionEdition)` lambda `get_or_create`s the beating row — heimspiel
+cron, provider cron and `create_opta_matching_from_us_soccer` all had to be relocked
+([heimspiel-lineups-wilson-flow](heimspiel-lineups-wilson-flow.md)).
 
 ## Who loads `Player` in football
 

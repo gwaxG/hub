@@ -1,7 +1,7 @@
 ---
 repo: [wilson, football]
-mr: [wilson!2664, football!1575]
-verified_at: 2026-10-01
+mr: [wilson!2664, football!1575, wilson!2818, football!1680, skcr-models!81]
+verified_at: 2026-11-04
 ---
 
 # Football launch cron and the processing pool
@@ -24,3 +24,15 @@ it acts only on POST_MATCH matches, uses `requester='stadium_update'`, and calls
 
 Fix (2026-10-01): wilson !2664 makes the dimensions relaunch and `set_matches_to_retry_online` skip or refuse future matches.
 football !1575 makes the cron skip a future match: it returns without launching, and the row stays in the pool.
+
+## Moving the MatchBeating writes to Wilson (ADR 0011, open as of 2026-11-04)
+
+`task_by_row_v2` writes `MatchBeating` (`started_at`, then in `finally` `last_try`, `started_at=None`, plus `done=True` on success).
+That made it the last Football writer. With `WILSON_DB_READONLY` set (wilson!2795), every launch failed (Sentry FOOTBALL-29V), and football!1660 reverted it.
+The plan: Football selects the match read-only and publishes `pipeline.launch_attempted` `{succeeded}` (skcr-models!81, football!1680).
+Wilson's `apply_domain_events` maps it to `Target.MATCH_BEATING`: `last_try=occurred_at`, `started_at=None`, `done=True` on success, and it creates the row if missing (wilson!2818).
+Accepted risks: no timestamp gate, so a late event can mark a re-queued match done. A lost event leaves `last_try` unchanged and pins the queue head; the DLQ alarm detects it and a redrive fixes it.
+
+**Rollout rule:** the `apply_domain_events` lambda image installs `son` from the private registry, using its own `uv.lock` and not `server/`.
+A new `Target` in `server/son/domain_events_mapping.py` is referenced in `app.py`'s `_HANDLERS` at import. If the locked son lacks it, the import fails and **every** event dead-letters.
+The `server/` tests use local son, so CI stays green. Order: release son, bump the lambda's `son` pin and relock, then deploy.
