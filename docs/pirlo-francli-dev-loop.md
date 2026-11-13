@@ -1,3 +1,9 @@
+---
+repo: [wilson, football]
+mr: []
+verified_at: 2026-11-13
+---
+
 # pirlo + francli: the prerelease / deploy / validate loop
 
 Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL.md`). Facts verified 2026-11-10.
@@ -29,3 +35,12 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
   `qa/test_qa_run.py`) executes it deterministically. Before running, it checks the pirlo env git tag (`refs/tags/<env>`,
   moved by the deploy pipeline's `update_tag` stage) equals the branch head. It polls
   `francli football status --format json` (`pipeline_status`, `processed_at`). `qa-verifier` judges the results and posts a short MR note.
+
+## Reaching a custom wilson stack's DB
+
+ECS exec is off on custom stacks, but the Aurora instance `skcr-<stack>-aurora` is publicly accessible. Read
+`/<stack>/wilson/DB_CREDS` from Secrets Manager into a 0600 scratch file (it holds `PASSWORD_ARN`, resolved by
+the settings) and run a local Django shell from the wilson root:
+`AWS_PROFILE=… SKILLCORNER_ENV=dev DJANGO_SETTINGS_MODULE=wilson.settings_local DB_CREDS="$(cat creds.json)"
+uv run python server/manage.py shell -c "…"`. Use the root venv (`server/` alone lacks `configargparse`).
+Lambdas on a custom stack run with `VIDIC_ENV=prod`: never reach a Vidic push there.
