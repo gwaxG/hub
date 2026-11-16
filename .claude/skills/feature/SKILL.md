@@ -23,6 +23,19 @@ to ask the user: you ask the user directly at the gates.
 - Trim command output (`| tail -n 40`); long runs (deploys, `qa_run.py`) go in the background.
 - Don't paste briefs, diffs or plans back to the user; show the gate summaries only.
 
+## Task list
+
+Start every run with exactly these steps as the task list, and advance it as phases complete (on a restart, set
+the step you go back to as in progress):
+
+1. Investigate ticket (tech + football)
+2. Write plan, get approval
+3. Implement + self-review
+4. Open draft MRs
+5. Prerelease + deploy
+6. Plan + run QA
+7. Judge QA, hand off
+
 ## State
 
 `~/.cache/skillcorner-dev/<ticket-slug>/`:
