@@ -1,11 +1,13 @@
-export type SessionRow = {
+export type SessionLink = { title: string; link: string }
+
+export type SessionRow = SessionLink & {
   id: string
-  title: string
   isRunning: boolean
   status: string | null
   detail: string | null
   needsAction: string | null
-  lastActivityAt: string
+  workedAt: string
+  tokens: number
 }
 
 export type MergeRequestRow = {
@@ -14,6 +16,9 @@ export type MergeRequestRow = {
   url: string
   isDraft: boolean
   isReview: boolean
+  approvedBy: string[]
+  package: string
+  origin: SessionLink | null
   pipeline: { status: string; url: string } | null
 }
 

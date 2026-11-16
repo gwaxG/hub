@@ -1,3 +1,8 @@
+---
+repo: [hub]
+mr: []
+verified_at: 2026-11-13
+---
 # pirlo + francli: the prerelease / deploy / validate loop
 
 Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL.md`). Facts verified 2026-11-10.
