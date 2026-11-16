@@ -55,6 +55,10 @@ show the user who holds it and ask for permission. On a yes, record it as a stan
 respawn the agent. Wait for its table. A deployed commit that doesn't match the branch head is a failure (go to
 "On failure").
 
+Prereleases never appear in `pyproject.toml` specs, which always name the final version (for example
+`skcr-models>=0.39.2,<1`). A prerelease may appear only in `uv.lock`, where it is a temporary resolution until the
+final version is released and the lock is repinned.
+
 ## Phase 4: QA
 
 1. Spawn **`qa-planner`** with the worktrees, MRs, env, `plan.md` and both briefs → `iter-N/plan.yaml`.

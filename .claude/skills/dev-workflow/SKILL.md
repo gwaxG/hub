@@ -14,7 +14,7 @@ branches, the env, and `approved_env` once the user has said yes to a shared env
 `qa_run.py` → `qa-verifier`.
 
 To take a whole ticket through every phase in a loop, use the **`feature-loop`** skill. It conducts the agents and
-relies on this skill for the mechanics.
+relies on this skill for the mechanics. To do the same in one session without agents, use the **`feature`** skill.
 
 ## Phase 0: Explore before planning
 
@@ -61,10 +61,12 @@ can use it.
 
 On the wilson / football feature branch:
 
-- Set the spec to accept the prerelease (e.g. `son>=0.93.0a0,<1`), `uv lock` in the right dir (wilson root,
-  `server/`, each touched lambda; football root/lambdas), commit both `pyproject.toml` and `uv.lock`, push.
-- Pinning a prerelease on the consumer branch is fine at review time; the final repin comes after the lib merges
-  (step 6).
+- Prereleases never appear in `pyproject.toml` specs, which always name the final version (e.g.
+  `skcr-models>=0.39.2,<1`). A prerelease may appear only in `uv.lock`, as a temporary resolution until the final
+  version is released and the lock is repinned (step 6).
+- Re-lock only the lib: `uv lock --prerelease=if-necessary-or-explicit -P <lib>` in the right dir (wilson root,
+  `server/`, each touched lambda; football root/lambdas). Check every lock for unintended prereleases of other
+  packages, commit the `uv.lock` files only, push.
 - uv index gotchas: data-provider-clients uses the named `internal` index — never set `UV_DEFAULT_INDEX` there.
   For wilson pushes (pre-push hook runs `uv lock`) `UV_DEFAULT_INDEX` may be needed.
 
@@ -161,8 +163,8 @@ Never pass `--force` (wipes data buckets irreversibly) unless asked. Never destr
 
 ## 6. After merge: repin
 
-The user merges the lib MRs (final versions get published). Then on each consumer branch: replace the prerelease
-spec with the final version, `uv lock` everywhere it was pinned, commit, push. For son, this is often a follow-up
+The user merges the lib MRs (final versions get published). Then on each consumer branch: re-lock every `uv.lock`
+that resolved the prerelease so it resolves the final version (`uv lock -P <lib>`), commit, push. For son, this is often a follow-up
 MR relocking lambdas.
 
 ## Guardrails

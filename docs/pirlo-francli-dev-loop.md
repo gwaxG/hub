@@ -10,6 +10,9 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
 - **pirlo** (`uvx pirlo`, also `~/.local/bin/pirlo`) triggers GitLab CI for release, deploy, status, destroy.
   Project and branch come from the git checkout.
   - `release` defaults to `--version prerelease` → `X.Y.Za0+<user>`.
+  - **Pinning rule** (user, 2026-11-17): a prerelease never appears in a `pyproject.toml` spec, which always names the
+    final version (e.g. `skcr-models>=0.39.2,<1`). It may appear only in `uv.lock`, as a temporary resolution until the
+    final version is released and the lock is repinned (lock mechanics: `wilson-custom-stack-lambda-builds.md`).
   - `deploy --env other --stack-name X` == `deploy --env X`: any env not in `STANDARD_ENVS` is a custom
     stack (`pirlo/utils.py` `trigger_deploy_gitlab`). It sets `ENV=other` + `PAULUMI_CUSTOM_STACK_NAME`, and paulumi
     swaps the `other` stack name for the custom one (`paulumi.py` `_handle_other_stack`).

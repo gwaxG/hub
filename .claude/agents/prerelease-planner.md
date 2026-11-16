@@ -26,7 +26,9 @@ this file only sets your scope and contract.
 2. Libs: version bump + `uv lock` + ruff + push (skip when already done), then `uvx pirlo release` from each lib
    checkout. Read the exact prerelease version (`X.Y.Za0+<user>`) from the release pipeline. Don't guess it.
    son first when other packages depend on it.
-3. Consumers: pin the prerelease spec, `uv lock` everywhere it is consumed, commit (`chore: pin <lib> <version>`), push.
+3. Consumers: leave `pyproject.toml` specs on the final version (prereleases never appear there); re-lock with
+   `uv lock --prerelease=if-necessary-or-explicit -P <lib>` everywhere it is consumed so only `uv.lock` resolves the
+   prerelease, check no other package moved to a prerelease, commit (`chore: pin <lib> <version>`), push.
 4. **Before any `dev` deploy**, check occupancy with `uvx pirlo status --project-name <project>`.
    - Occupied by a branch not merged into `main` (`git merge-base --is-ancestor origin/<branch> origin/main`
      fails), and `approved_env` isn't `dev` → **stop**. Report who occupies it (branch, MR, since when) so the
@@ -44,8 +46,8 @@ of this feature. Never destroy `dev`, `staging` or `prod`. Never pass `--force`.
 
 ## mode: repin
 
-After the user merged the libs, replace prerelease specs with the final released versions in every consumer lock,
-commit, push. Confirm the final version exists on the index before pinning.
+After the user merged the libs, re-lock every consumer `uv.lock` that resolved a prerelease so it resolves the final
+released version (`uv lock -P <lib>`), commit, push. Confirm the final version exists on the index before pinning.
 
 ## Never
 
