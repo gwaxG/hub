@@ -42,6 +42,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 
 ## wilson
 
+- [Configurable extra time half duration](docs/configurable-extra-time-half-duration.md) — NCAA 2x45+2x10 ET; CE run-param field (migration 0288, default 15, 10 for shorter halves), pipeline payload incl. partial reruns; merged 2026-11-17; prerelease-pin lessons
 - [Wilson Cognito JIT migration](docs/wilson-cognito-jit-migration.md) — verify-credentials + lookup-user (X-Migration-Key, prod-only key); exact username vs iexact login
 - [Physical v3/v4 flow: football → Icebergkamp → ClickHouse → wilson](docs/physical-v4-icebergkamp-flow.md) — S3→EventBridge→SQS→SFN→Glue→Iceberg→CH refresh; v3 statuses via 5-min sync task; v4 not served (CH reads dev snapshot); 2026-11-04 backfill backlog runbook; wilson domain-events filter allowlist (!2838) silently drops unlisted events — verify physical.loaded positively, not via empty DLQ; v4 DC columns + mapping in !2858
 - [Match creation workflow](docs/match-creation-workflow.md) — provider match creation: Forest Admin activation → task-by-row scheduler → provider clients; MCS statuses, completeness re-runs, Heimspiel + video provider on one match
