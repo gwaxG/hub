@@ -12,7 +12,7 @@ source: [https://app.notion.com/p/41a6552a98c98106b3d8de48e283cadc]
 without moving the folder, orphaning data (matches 2081836, 2075741, historical_v4 relaunch failed). It was never
 implemented, not a regression (Forest had a shaky version).
 
-**Design (wilson !2908, son 0.101.0):** `MatchS3RenamePublisher.publish(match, old_name)` (son) after the save in
+**Design (wilson !2908, son 0.101.0):** `MatchS3RenamePublisher.publish_if_renamed(match, old_name)` (son) after the save in
 Gaffer `match_update_serializer` and Heimspiel `_update_match_metadata_from_provider`; `transaction.on_commit` sends
 `{old_match_name,new_match_name,new_match_date_time}` to FIFO queue `wilson-match-s3-rename-<env>.fifo`, group id =
 match id (ordered A->B, B->C), random dedup id. The existing `edit_match_name_s3` lambda consumes it (`triggers.sqs`,
