@@ -50,6 +50,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Heimspiel lineups in wilson](docs/heimspiel-lineups-wilson-flow.md) — !2540 merged (son 0.91.0): per-CE lineup source frozen by lineup_provider, ignored+reason statuses, operator lineups, inline HS subs, Vidic push + count-only gap, AddField relock trap
 - [Validating match creation on dev](docs/match-creation-dev-validation.md) — dev crons off → invoke with {"competitionedition_id"}, dev writes prod Vidic, make matches incomplete to re-run, capture Vidic payload without writing
 - [Heimspiel vs SICS/SmrtStats in Forest Admin](docs/heimspiel-vs-all.md) — CompetitionEdition match-creation UI compared across providers
+- [Wilson player metadata cron](docs/wilson-player-metadata-cron.md) — Heimspiel player sync + per-field `metadata_source` locks live in wilson; weekly ECS cron Tuesdays 09:00 UTC (!2832, merged), warnings only; FMS ingestion is create-only
 - [NCAA lineups vs Heimspiel](docs/ncaa-lineups-vs-heimspiel.md) — read-only `evaluate_ncaa_lineups` command (unmerged branch); mapping, minute and position conventions
 - [Match uniqueness window](docs/match-uniqueness-window.md) — duplicate guard for Gaffer/Forest/merge_teams: ±24h home/away pair (was 12h), wilson !2695
 - [Prod DB overload 2026-10-15](docs/prod-db-overload-octopol-2026-10-15.md) — gaffer 504s: octopol 6-account deep-offset/huge-filter API scraping OOM-restarted skcr-prod-aurora; how to investigate (PI, Logs Insights, Sentry API); fix wilson !2722
