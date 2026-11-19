@@ -52,7 +52,12 @@ Next runs were all ok. Real leads left: match 2100122 stuck all day 2026-11-02; 
 - SNS `wilson-backend-alerts-<env>` (prod only, `01_infrastructure/backend_alerts.py`) → e-mail to
   #product-area-backend-alerts. Chatbot was dropped: wilson CI role lacks `chatbot:*` / PassRole.
   After first deploy the confirmation e-mail in the channel must be clicked once.
-- Dashboards are imported by hand (online Grafana stores v2 schema). Kickoff-template services publish via
+- Dashboards are imported by hand (online Grafana stores v2 schema): Dashboards → New → Import, paste the repo
+  JSON, **Import (Overwrite)** on the same uid (keeps URL + version history). Grafana 13's "Edit as code" shows
+  v2 JSON, so pasting the classic repo JSON there does not work.
+- Backend Serving physical/GI panels matched `^/api/.*/<family>` = match-level only, missing the aggregated
+  `/api/physical` (~90% of physical traffic) and `/api/metrics/game_intelligence/…`. Fixed in wilson!2937
+  (`^/api/(.*/)?<family>`; tables take the match id from the path or `?match=<digits>(&|$)`). DE is match-level only. Kickoff-template services publish via
   `pulumiverse_grafana` in `pulumi/01_infrastructure/grafana_dashboard_config.py` (token
   `GRAFANA_AUTH_TOKEN`, publish from prod only); a candidate follow-up for wilson.
 - Local Grafana: `make monitoring` (127.0.0.1:3000); provisioning files are local-only, same datasource uids.
