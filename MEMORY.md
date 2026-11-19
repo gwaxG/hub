@@ -27,6 +27,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Heimspiel extra time & penalty shootouts](docs/heimspiel-extra-time-and-penalties.md) — how the Heimspiel client models knockout matches past 90'; two data sources (result periods + events) needed together
 - [Heimspiel placeholder teams](docs/heimspiel-placeholder-teams.md) — `show_team: "no"`; `Team.is_placeholder` in list + details paths; CE match creation skips them silently (dpc !44 → 1.14.0, wilson !2681)
 - [Heimspiel match incident & coverage](docs/heimspiel-match-incident.md) — `match_incident` ids 3/4/6/7 → common `Match.incident`; `is_finished_with_coverage` = finished+full coverage (dpc !43)
+- [Heimspiel split seasons & 1-to-N CE mapping](docs/heimspiel-split-seasons-ce-mapping.md) — comp 100 = Peru; which leagues split; wilson!2875: N CE matchings used by creation + metadata crons only, Forest/Gaffer unchanged; metadata cron is ECS
 - [Heimspiel lineup & instruction ingestion](docs/heimspiel-lineup-ingestion.md) — task 807: TeamLineup (bench, sub-only players, rebuilt starters), subs+red cards only, minute−1+extra_minute timing (dpc !48 → 1.16.0, wilson !2540)
 - [dpc private uv index](docs/dpc-uv-private-index.md) — named "internal" index; never UV_DEFAULT_INDEX (rewrites uv.lock); UV_PYTHON=3.13.4 for fresh venvs
 
