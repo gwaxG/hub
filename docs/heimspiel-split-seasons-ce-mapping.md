@@ -28,7 +28,7 @@ CompetitionEdition (CE) per year. Facts from read-only Heimspiel calls and the d
   rejects only a repeated `(provider, id)` or a repeated matching id (409 still for an id owned by another CE).
   Forest launch-match sends `provider_competition_edition_ids` (plus the lone id for 1-1) to `create_match_from_provider`,
   which searches every listed CE; refresh-events fans out. Public serializer returns the oldest matching.
-- **gaffer-front** CE form still allows one matching per provider (`isProviderRepeatable` only on stadiums): a
+- **gaffer-front is out of scope** (user, 2026-11-20): its CE form still allows one matching per provider (`isProviderRepeatable` only on stadiums); a
   one-line frontend change is needed before users can add a 2nd edition in the UI.
 - QA trick for Forest actions that invoke a lambda `InvocationType='Event'`: run the action locally
   (`SKILLCORNER_ENV=<stack> manage.py shell`) with `boto3.client` patched to replay the payload `RequestResponse` on
