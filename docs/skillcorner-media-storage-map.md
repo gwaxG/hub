@@ -1,6 +1,6 @@
 ---
 repo: [football-metadata-service, football-metadata-service-client, argocd, orion, orion-front, vidic-client]
-mr: [football-metadata-service!24, football-metadata-service-client!10, argocd-platform-services-football-metadata-service!30]
+mr: [football-metadata-service!24, football-metadata-service-client!10, argocd-platform-services-football-metadata-service!30, argocd-platform-services-football-metadata-service!32]
 verified_at: 2026-11-20
 source: https://app.notion.com/p/41b6552a98c980beb00dfdcb2d140dca
 ---
@@ -30,7 +30,19 @@ Status 2026-11-20: FMS !24, client !10, argocd !30 open as drafts; QA passed on 
 - **skcr-utils `S3Storage.generate_presigned_url` does a HEAD** before signing (one S3 call per read; a missing object raises 403 without ListBucket → 500). Sign locally with boto3 instead.
 - **A plain boto3 S3 client presigns with SigV2** (`AWSAccessKeyId=…&Signature=…`), rejected by buckets created after mid-2020. Use `Config(signature_version='s3v4')`.
 - **pirlo needs the full project path** for FMS: `skillcorner/software/football-metadata-service` (the bare name also matches the argocd chart project). `pirlo deploy --env dev` works for FMS; CI's update-helm opens and auto-merges the dev image bump in the argocd chart.
-- **Running FMS jobs on dev:** dev has no CronJobs, and the API pod (250m / 256Mi) OOMs on son. Run a one-off Job from the deployed image with the dev service account and 4Gi (`football-metadata-service-dev` namespace, cluster `workloads-prod`).
+- **Running FMS jobs on dev:** the API pod (250m / 256Mi) OOMs on son, so never `kubectl exec` a job there. A deploy only changes the image: CronJobs come from the argocd chart values per env (`environments/<env>/values.yaml`, `fastapi-base.cronJobs`). argocd !32 adds `ingest-players` and `refresh-images` to dev as **suspended** CronJobs (`backoffLimit: 0`, `--limit 1000`); `fastapi-base` ≥ 0.3.1 supports `suspend` / `backoffLimit` per job.
+- **Dev cron test workflow** (!32 merged 2026-11-20; tested with `--limit 100`): (1) `pirlo deploy --project-name skillcorner/software/football-metadata-service --branch <branch> --env dev`; (2) run a job from a suspended CronJob with plain kubectl (`AWS_PROFILE=Production.Skcr-Software-Common-Role`, kube context `workloads-prod`):
+  ```bash
+  NS=football-metadata-service-dev
+  # as defined (--limit 1000); use ...-ingest-players for the daily job
+  kubectl create job --from=cronjob/$NS-refresh-images refresh-images-manual-$(date +%s) -n $NS
+  # other limit: rewrite the value in the rendered Job (the command list renders it as - "1000")
+  kubectl create job --from=cronjob/$NS-ingest-players ingest-players-manual-$(date +%s) -n $NS \
+    --dry-run=client -o yaml | sed 's/- "1000"/- "100"/' | kubectl create -f -
+  kubectl get jobs -n $NS; kubectl logs -f job/<job-name> -n $NS
+  ```
+  `uv run workflows/fms_dev_cron.py <ingest-players|refresh-images> [--limit N]` wraps the same steps, waits for the Job and exits non-zero on failure.
+- **FMS client locally without installing:** `uv run --no-project --python 3.13 --index internal=https://pypi.skillcorner.com/pypi/internal/simple/ --with 'football-metadata-service-client==<version>' --with httpx python …`. `--python 3.13` is required: uv otherwise picks free-threaded 3.14t, where `orjson` (via fitrequest) fails to build. `FootballMetadataServiceClient(env='dev')` uses M2M auth from SSM (needs the AWS profile). A pirlo prerelease of the client is `X.Y.Za0+<user>` built from the current pyproject version, so it sorts *below* the released `X.Y.Z` — pin it exactly.
 - **FMS API on dev:** the gateway needs a Cognito JWT even for `/api/health`. Use `kubectl port-forward svc/football-metadata-service-dev` plus the `X-User-Sub` header.
 - **QA runner gap:** `~/.claude/agents/qa/qa_run.py` has no shell/SQL step and cannot send custom headers, so FMS QA ran as manual steps.
 
