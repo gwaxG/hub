@@ -17,16 +17,24 @@ CompetitionEdition (CE) per year. Facts from read-only Heimspiel calls and the d
   1756 ARG, 1763 URY Intermedio). Moving them into the base CE is out of scope of Task 4107.
 - Heimspiel season dates cover the whole year; Clausura "Round N" collides with Apertura; Playoffs use matchday 0/1/2.
 
-## wilson!2875 (Task 4107), scope agreed 2026-11-19
+## wilson!2875 (Task 4107), scope widened 2026-11-20
 - Migration 0290 drops unique `(competition_edition, provider)` on `CompetitionEditionMatching`, keeps
   `(provider, provider_competition_edition_id)`. son 0.103.0.
-- N is used only by `create_provider_matches_from_ce` (both CE creation lambdas), the Heimspiel metadata cron
+- N is used by `create_provider_matches_from_ce` (both CE creation lambdas), the Heimspiel metadata cron
   (`update_created_matches`, keyed by the tuple of a CE's matchings) and `force_match_metadata_update`.
-  Helper `get_provider_matches_for_competition_editions`: dedupe by provider match id, skip+log a failed fetch,
-  raise only if all fail, re-raise `ApproachingTimeoutError`. SICS keeps one call (ignores the CE id).
-- **Forest, Gaffer, `create_match_from_provider` and the public serializer are deliberately unchanged** (user decision).
-  Gaffer still rejects two matchings of one provider, so N rows are created via DB/admin. Forest `.get()` on such a CE
-  raises `MultipleObjectsReturned`.
+  Helper `get_provider_matches_for_competition_editions`: fetch each distinct id once, dedupe by provider match id,
+  skip+log a failed fetch, raise only if all fail, re-raise `ApproachingTimeoutError`. SICS keeps one call.
+- Gaffer and Forest are adapted too (user, 2026-11-20; on 2026-11-19 they were kept unchanged): Gaffer CE create/update
+  rejects only a repeated `(provider, id)` or a repeated matching id (409 still for an id owned by another CE).
+  Forest launch-match sends `provider_competition_edition_ids` (plus the lone id for 1-1) to `create_match_from_provider`,
+  which searches every listed CE; refresh-events fans out. Public serializer returns the oldest matching.
+- **gaffer-front** CE form still allows one matching per provider (`isProviderRepeatable` only on stadiums): a
+  one-line frontend change is needed before users can add a 2nd edition in the UI.
+- QA trick for Forest actions that invoke a lambda `InvocationType='Event'`: run the action locally
+  (`SKILLCORNER_ENV=<stack> manage.py shell`) with `boto3.client` patched to replay the payload `RequestResponse` on
+  the stack lambda (local `settings.ENVIRONMENT` is `local`: rewrite the function name). Gaffer views run in-process
+  with DRF `force_authenticate` on a staff user, no password needed.
+- `ProviderMatchCreationReport.save` skips a report equal to the previous one, so the lambda returns `report_id: null`.
 - `update_matches_metadata` is an ECS task (`ecs/management/commands/update_matches_metadata.py`, IaC
   `pulumi/aws/management/update_matches_metadata/ecs_task_config.yaml`, every 6 h, prod+dev only); on a custom stack run
   it by hand. The cron writes 2 `MetadataUpdateHistory` rows per checked match (fields + locked fields) by design.
