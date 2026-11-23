@@ -21,8 +21,12 @@ ships in the MR and is archived into `openspec/specs/` at hand-off, so specs lan
   (`context`, `rules`) and `instructions apply --json` (`operationGuidance`). A fork
   (`openspec schema fork spec-driven <name>` → `openspec/schemas/<name>/`) would copy ~300 lines of upstream
   instructions into every repo and freeze them.
-- Only the conductor runs propose / update / archive (they ask the user); subagents read the change via
+- Only the conductor runs explore / propose / update / archive (they ask the user); subagents read the change via
   `openspec instructions apply --json` and tick `tasks.md`.
+- `openspec-explore` does not replace tech-explorer / football-explorer: it is a conversation with the user, with
+  no fixed output, and it asks before every write, so a subagent can't run it. The loop uses it at the gate when a
+  verdict isn't "clear" and on a "wrong understanding" restart, then `openspec-update-change` folds the decisions
+  in. tech-explorer reads existing `openspec/specs/` instead (`openspec list --specs`, `openspec show`).
 - Spec scenarios are the QA oracles: qa-planner writes one check per scenario, the verifier judges per scenario.
 
 ## Traps
