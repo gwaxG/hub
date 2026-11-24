@@ -11,7 +11,9 @@ class FolderAmbiguous(Exception):
     pass
 
 
-def resolve_folder(session_folder: Path | None, mr_url: str | None, cache_root: Path) -> Path:
+def resolve_folder(
+    session_folder: Path | None, mr_url: str | None, cache_root: Path
+) -> Path:
     if session_folder is not None:
         return session_folder
     if mr_url is None:

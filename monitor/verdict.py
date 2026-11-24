@@ -28,7 +28,11 @@ def evaluate(evidence: TickEvidence, history: list[Verdict]) -> Verdict:
 
 def _is_blind(evidence: TickEvidence) -> bool:
     no_baseline = evidence.baseline_error_count is None
-    return no_baseline or bool(evidence.unavailable_sources) or _zero_baseline_with_errors(evidence)
+    return (
+        no_baseline
+        or bool(evidence.unavailable_sources)
+        or _zero_baseline_with_errors(evidence)
+    )
 
 
 def _zero_baseline_with_errors(evidence: TickEvidence) -> bool:

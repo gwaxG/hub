@@ -2,14 +2,14 @@ from monitor.verdict import TickEvidence, evaluate
 
 
 def clean(**overrides) -> TickEvidence:
-    values = dict(
-        new_sentry_issues=0,
-        sentry_error_level_issues=0,
-        error_count=10,
-        baseline_error_count=10.0,
-        smoke_failures=0,
-        unavailable_sources=[],
-    )
+    values = {
+        "new_sentry_issues": 0,
+        "sentry_error_level_issues": 0,
+        "error_count": 10,
+        "baseline_error_count": 10.0,
+        "smoke_failures": 0,
+        "unavailable_sources": [],
+    }
     values.update(overrides)
     return TickEvidence(**values)
 
@@ -33,7 +33,9 @@ def test_error_rate_above_three_times_baseline_for_two_ticks_is_red():
 
 
 def test_zero_baseline_with_errors_is_yellow():
-    assert evaluate(clean(error_count=5, baseline_error_count=0.0), history=[]) == "YELLOW"
+    assert (
+        evaluate(clean(error_count=5, baseline_error_count=0.0), history=[]) == "YELLOW"
+    )
 
 
 def test_new_issue_or_smoke_failure_is_yellow():
@@ -46,4 +48,6 @@ def test_clean_tick_is_green():
 
 
 def test_zero_baseline_with_zero_errors_is_green():
-    assert evaluate(clean(error_count=0, baseline_error_count=0.0), history=[]) == "GREEN"
+    assert (
+        evaluate(clean(error_count=0, baseline_error_count=0.0), history=[]) == "GREEN"
+    )
