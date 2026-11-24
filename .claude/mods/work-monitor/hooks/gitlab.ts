@@ -38,7 +38,6 @@ function toRow(mr: GitlabMr, isReview: boolean): MergeRequestRow {
   return {
     ref: `!${mr.iid}`,
     package: mr.project.fullPath.split('/').pop() ?? mr.project.fullPath,
-    origin: null,
     title: mr.title.replace(/^Draft:\s*/i, ''),
     url: mr.webUrl,
     isDraft: mr.draft,

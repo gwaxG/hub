@@ -1,15 +1,3 @@
-export type SessionLink = { title: string; link: string }
-
-export type SessionRow = SessionLink & {
-  id: string
-  isRunning: boolean
-  status: string | null
-  detail: string | null
-  needsAction: string | null
-  workedAt: string
-  tokens: number
-}
-
 export type MergeRequestRow = {
   ref: string
   title: string
@@ -18,12 +6,21 @@ export type MergeRequestRow = {
   isReview: boolean
   approvedBy: string[]
   package: string
-  origin: SessionLink | null
   pipeline: { status: string; url: string } | null
 }
 
+export type UsageRow = { name: string; hour: number; window: number }
+
+/** Weighted tokens of the last hour and of the last 5 hours: the sessions that used most, and the others as one row. */
+export type Usage = {
+  hour: number
+  window: number
+  biggest: UsageRow[]
+  others: UsageRow | null
+}
+
 export type Snapshot = {
-  sessions: SessionRow[]
+  usage: Usage | null
   mergeRequests: MergeRequestRow[]
   errors: string[]
   refreshedAt: number

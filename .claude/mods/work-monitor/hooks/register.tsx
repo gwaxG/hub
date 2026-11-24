@@ -1,15 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { MergeRequestRow, SessionRow, Snapshot } from '../types'
+import type { MergeRequestRow, Snapshot, UsageRow } from '../types'
 import { fetchMergeRequests } from './gitlab'
-import { fetchSessionWork } from './sessions'
+import { findOriginLink } from './origin'
+import { fetchUsage } from './usage'
 
 const PANE = 'work-monitor'
 const TITLE = 'Work monitor'
 const POLL_MS = 60_000
-const DAY_MS = 24 * 3600_000
-const TOKEN_FLOOR = 100_000
+// Weighted tokens that fill the plan's 5-hour window: 1.81M read as 7% on 2026-11-18. One reading, so a rough guide.
+const WINDOW_BUDGET = 26_000_000
 // A short separation line above each repository's group.
 const RULE = '─'.repeat(12)
 const ACTIVE_CI = new Set(['CREATED', 'WAITING_FOR_RESOURCE', 'PREPARING', 'PENDING', 'RUNNING'])
@@ -22,9 +23,9 @@ const STATUS_COLOR: Record<string, string> = {
   MANUAL: 'suggestion',
 }
 
-const EMPTY: Snapshot = { sessions: [], mergeRequests: [], errors: [], refreshedAt: 0 }
+const EMPTY: Snapshot = { usage: null, mergeRequests: [], errors: [], refreshedAt: 0 }
 const snapshot = atom({ plugin: 'work-monitor', key: 'snapshot' } as const, EMPTY, {
-  shape: 'snapshot-4',
+  shape: 'snapshot-9',
 })
 
 async function settle<T>(work: Promise<T>, label: string, errors: string[]): Promise<T | null> {
@@ -38,26 +39,27 @@ async function settle<T>(work: Promise<T>, label: string, errors: string[]): Pro
 
 async function refresh($: EngineInterface): Promise<void> {
   const errors: string[] = []
-  const [work, mergeRequests] = await Promise.all([
-    settle(fetchSessionWork($), 'Sessions', errors),
+  const [usage, mergeRequests] = await Promise.all([
+    settle(fetchUsage($), 'Tokens', errors),
     settle(fetchMergeRequests($), 'GitLab', errors),
   ])
   await update($, snapshot, previous => ({
-    sessions: work?.sessions ?? previous.sessions,
-    mergeRequests: mergeRequests?.map(mr => ({ ...mr, origin: work?.originOf(mr.url) ?? null })) ?? previous.mergeRequests,
+    usage: usage ?? previous.usage,
+    mergeRequests: mergeRequests ?? previous.mergeRequests,
     errors,
     refreshedAt: Date.now(),
   }))
 }
 
-function age(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000))
-  if (minutes < 60) return `${minutes}m`
-  return minutes < 1440 ? `${Math.round(minutes / 60)}h` : `${Math.round(minutes / 1440)}d`
-}
-
 function tokens(count: number): string {
   return count >= 1_000_000 ? `${(count / 1_000_000).toFixed(1)}M` : `${Math.round(count / 1000)}k`
+}
+
+/** Opens the session that produced the MR through the desktop app's claude:// handler; the pane draws only https links. */
+async function openOrigin($: EngineInterface, mr: MergeRequestRow): Promise<void> {
+  const link = await findOriginLink($, mr.url)
+  if (link) await $.process.run(['xdg-open', link])
+  else await $.ui.toast(`No session found for ${mr.package}${mr.ref}`)
 }
 
 /** Merge requests grouped by package (wilson, football, ...), packages in name order. */
@@ -105,33 +107,6 @@ export const register: Register = on => {
       </Box>
     )
 
-    const sessionGlyph = (session: SessionRow) =>
-      session.isRunning ? (
-        <Text color="success">●</Text>
-      ) : session.needsAction || session.status === 'blocked' ? (
-        <Text color="warning">◆</Text>
-      ) : (
-        <Text color="inactive">○</Text>
-      )
-
-    const sessionRow = (session: SessionRow) => (
-      <Box flexDirection="column">
-        <Box flexDirection="row" gap={1}>
-          {sessionGlyph(session)}
-          {grow(<Text wrap="truncate">{session.title}</Text>)}
-          <Text dimColor>{tokens(session.tokens)}</Text>
-          <Text dimColor>{age(session.workedAt)}</Text>
-        </Box>
-        {(session.needsAction || session.detail) && (
-          <Box paddingLeft={2}>
-            <Text dimColor wrap="truncate">
-              {session.needsAction || session.detail}
-            </Text>
-          </Box>
-        )}
-      </Box>
-    )
-
     const status = (mr: MergeRequestRow) =>
       mr.pipeline ? (
         <Text color={STATUS_COLOR[mr.pipeline.status] ?? 'inactive'}>
@@ -139,16 +114,6 @@ export const register: Register = on => {
         </Text>
       ) : (
         <Text dimColor>no ci</Text>
-      )
-
-    // Opens the session through the desktop app's claude:// handler; the pane draws only https links.
-    const openSession = (mr: MergeRequestRow, place: string) =>
-      mr.origin && (
-        <Button
-          key={`session-${place}-${mr.package}${mr.ref}`}
-          label="Session"
-          onPress={() => $.process.run(['xdg-open', mr.origin!.link]).then(() => undefined)}
-        />
       )
 
     // `place` names the section, so an MR shown in two sections keys its button apart.
@@ -164,7 +129,7 @@ export const register: Register = on => {
             {mr.title}
           </Text>,
         )}
-        {openSession(mr, place)}
+        <Button key={`session-${place}-${mr.package}${mr.ref}`} label="Session" onPress={() => openOrigin($, mr)} />
       </Box>
     )
 
@@ -177,10 +142,14 @@ export const register: Register = on => {
         </Box>
       ))
 
-    const running = data.sessions.filter(session => session.isRunning)
-    const isToday = (session: SessionRow) => Date.now() - Date.parse(session.workedAt) < DAY_MS
-    const today = data.sessions.filter(isToday)
-    const week = data.sessions.filter(session => !isToday(session) && session.tokens > TOKEN_FLOOR)
+    const usageRow = (source: UsageRow) => (
+      <Box flexDirection="row" gap={1}>
+        {grow(<Text wrap="truncate">{source.name}</Text>)}
+        <Text dimColor>{tokens(source.hour)}</Text>
+        <Text>{tokens(source.window)}</Text>
+      </Box>
+    )
+
     const activeCi = data.mergeRequests.filter(mr => mr.pipeline && ACTIVE_CI.has(mr.pipeline.status))
     const failedCi = data.mergeRequests.filter(mr => mr.pipeline?.status === 'FAILED')
     const mine = data.mergeRequests.filter(mr => !mr.isReview)
@@ -195,20 +164,16 @@ export const register: Register = on => {
         {data.errors.map(error => (
           <Text color="error">{error}</Text>
         ))}
+        {data.usage &&
+          section(
+            `Tokens · last hour ${tokens(data.usage.hour)} · 5 hours ${tokens(data.usage.window)} · ~${Math.round((data.usage.window / WINDOW_BUDGET) * 100)}%`,
+            [...data.usage.biggest, ...(data.usage.others ? [data.usage.others] : [])].map(usageRow),
+            'No usage.',
+          )}
         {section(`CI · ${activeCi.length} active`, activeCi.map(mr => mrRow(mr, 'ci')), 'No pipeline running.')}
         {failedCi.length > 0 && section(`CI · ${failedCi.length} failed`, failedCi.map(mr => mrRow(mr, 'failed')), '')}
         {section(`My merge requests · ${mine.length}`, grouped(mine, 'mine'), 'None open.')}
         {section(`Review requested · ${review.length}`, grouped(review, 'review'), 'None.')}
-        {section(
-          `Sessions · last 24 hours · ${today.length}${running.length ? ` · ${running.length} running` : ''}`,
-          today.map(sessionRow),
-          'No session worked in during the last 24 hours.',
-        )}
-        {section(
-          `Sessions · last 7 days · over ${tokens(TOKEN_FLOOR)} tokens · ${week.length}`,
-          week.map(sessionRow),
-          'None.',
-        )}
       </Box>
     )
   })
