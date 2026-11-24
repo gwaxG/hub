@@ -48,6 +48,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [wilson data readiness probe](docs/wilson-data-readiness-probe.md) — hourly prod probe + 5 Grafana dashboards (!2782, !2820, !2822): per-check alert rules, noise tuning, GI via aggregated endpoints, physical censoring, async retry gotchas
 
 ## wilson
+- [Competition matching 1-to-N](docs/competition-matching-mapping.md) — wilson !2860: N provider ids per competition, fan-out via get_provider_competition_ids, earliest() scalar readers; open: Forest .get(), gaffer-front, son 0.103.0 repin
 
 - [Configurable extra time half duration](docs/configurable-extra-time-half-duration.md) — NCAA 2x45+2x10 ET; CE run-param field (migration 0288, default 15, 10 for shorter halves), pipeline payload incl. partial reruns; merged 2026-11-17; prerelease-pin lessons
 - [Wilson Cognito JIT migration](docs/wilson-cognito-jit-migration.md) — verify-credentials + lookup-user (X-Migration-Key, prod-only key); exact username vs iexact login
