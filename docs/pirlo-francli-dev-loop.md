@@ -18,6 +18,10 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
     swaps the `other` stack name for the custom one (`paulumi.py` `_handle_other_stack`).
   - `destroy --env X` has no `--stack-name`; the env *is* the stack. `--force` also deletes data buckets.
   - `deploy --force` overrides another pipeline's env lock.
+  - **Defaults are dangerous**: `pirlo deploy` with no flags uses the cwd project, the current branch and `--env dev`.
+    Never pass the flags through a shell variable set in an `&&` chain: if an earlier command fails, the variable stays
+    empty and the deploy goes to dev (happened 2026-11-24, cancelled during the Pulumi refresh). Write the flags inline
+    and check the dry run says `[<STACK>]` and `PAULUMI_CUSTOM_STACK_NAME`.
 - **DB topology**: a custom wilson stack gets its own DB; custom football stacks use the dev DB.
 - **Env rule**: every project deploys to its own `mr_<iid>` stack, wilson included. Wilson goes to `dev` only when the
   ticket needs a football pipeline run (football's `mr_<iid>` reads the dev DB). Before deploying to dev, check it with
