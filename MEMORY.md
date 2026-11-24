@@ -32,6 +32,10 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Heimspiel lineup & instruction ingestion](docs/heimspiel-lineup-ingestion.md) — task 807: TeamLineup (bench, sub-only players, rebuilt starters), subs+red cards only, minute−1+extra_minute timing (dpc !48 → 1.16.0, wilson !2540)
 - [dpc private uv index](docs/dpc-uv-private-index.md) — named "internal" index; never UV_DEFAULT_INDEX (rewrites uv.lock); UV_PYTHON=3.13.4 for fresh venvs
 
+## football
+
+- [Football custom stack data routing](docs/football-personal-stack-data-routing.md) — `mr-<iid>` / personal stacks: data buckets and dev DB/Vidic/Wilson API resolve to dev; pipeline outputs, SNS topic per stack; kit colour writes need dev
+
 ## football-metadata-service
 
 - [FMS architecture](docs/football-metadata-service-architecture.html) — football-metadata-service architecture page
