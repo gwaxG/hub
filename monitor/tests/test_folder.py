@@ -37,3 +37,9 @@ def test_no_match_is_not_found(tmp_path: Path):
     write_state(tmp_path, "a", "nothing here\n")
     with pytest.raises(FolderNotFound):
         resolve_folder(None, MR, tmp_path)
+
+
+def test_shorter_mr_url_does_not_match_longer_one(tmp_path: Path):
+    write_state(tmp_path, "long", f"{MR}0\n")
+    with pytest.raises(FolderNotFound):
+        resolve_folder(None, MR[:-1], tmp_path)

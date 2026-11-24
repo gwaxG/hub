@@ -51,3 +51,34 @@ def test_zero_baseline_with_zero_errors_is_green():
     assert (
         evaluate(clean(error_count=0, baseline_error_count=0.0), history=[]) == "GREEN"
     )
+
+
+def test_error_level_issue_is_red_even_when_a_source_is_down():
+    ev = clean(
+        new_sentry_issues=1, sentry_error_level_issues=1, unavailable_sources=["logs"]
+    )
+    assert evaluate(ev, history=["YELLOW"]) == "RED"
+
+
+def test_error_level_issue_is_red_even_without_baseline():
+    ev = clean(
+        new_sentry_issues=1, sentry_error_level_issues=1, baseline_error_count=None
+    )
+    assert evaluate(ev, history=["RED"]) == "RED"
+
+
+def test_first_error_level_issue_with_empty_history_is_yellow():
+    ev = clean(new_sentry_issues=1, sentry_error_level_issues=1)
+    assert evaluate(ev, history=[]) == "YELLOW"
+
+
+def test_error_count_between_1_5_and_3_times_baseline_is_yellow():
+    assert evaluate(clean(error_count=16), history=[]) == "YELLOW"
+
+
+def test_error_count_above_3_times_without_prior_flag_is_yellow():
+    assert evaluate(clean(error_count=31), history=["GREEN"]) == "YELLOW"
+
+
+def test_error_count_at_exactly_1_5_times_baseline_is_green():
+    assert evaluate(clean(error_count=15), history=[]) == "GREEN"

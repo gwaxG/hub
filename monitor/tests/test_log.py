@@ -15,3 +15,10 @@ def test_append_tick_writes_one_line_per_tick(tmp_path: Path):
         "- 2026-11-24T10:00Z tick 3 GREEN: 0 issues, 12 errors (baseline 11)",
         "- 2026-11-24T10:00Z tick 4 YELLOW: 1 new issue",
     ]
+
+
+def test_newline_in_summary_stays_on_one_line(tmp_path: Path):
+    when = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+    append_tick(tmp_path, 1, when, "RED", "1 new issue\nKeyError: 'x'")
+    lines = (tmp_path / "monitor-log.md").read_text().splitlines()
+    assert lines == ["- 2026-11-24T10:00Z tick 1 RED: 1 new issue KeyError: 'x'"]

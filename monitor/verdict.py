@@ -18,11 +18,11 @@ class TickEvidence:
 
 
 def evaluate(evidence: TickEvidence, history: list[Verdict]) -> Verdict:
-    if _is_blind(evidence):
-        return "YELLOW"
     flagged_before = bool(history) and history[-1] != "GREEN"
     if evidence.sentry_error_level_issues:
         return "RED" if flagged_before else "YELLOW"
+    if _is_blind(evidence):
+        return "YELLOW"
     return _rate_or_other_verdict(evidence, flagged_before)
 
 

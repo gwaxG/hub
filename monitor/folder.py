@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 STATE_NAME = "state.md"
@@ -30,5 +31,10 @@ def _folders_citing(mr_url: str, cache_root: Path) -> list[Path]:
     return [
         state.parent
         for state in sorted(cache_root.glob(f"*/{STATE_NAME}"))
-        if mr_url in state.read_text()
+        if _cites(state.read_text(), mr_url)
     ]
+
+
+def _cites(text: str, mr_url: str) -> bool:
+    pattern = re.escape(mr_url.rstrip("/")) + r"(?![\w/])"
+    return re.search(pattern, text) is not None
