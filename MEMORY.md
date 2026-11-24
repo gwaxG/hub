@@ -9,7 +9,6 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [maldini-api OBR variant timeout](docs/maldini-api-obr-variant-timeout.md) — obr_type+phase = 2,552 aggregate cols, FINAL + count re-query blow the 45s CH limit
 - [hub-graph / hub-mr code graph tools](docs/hub-graph-code-graph-tool.md) — `hub-graph` (whole repo) + `hub-mr` (feature integration vs merge base) over one shared engine; artefacts in `hub/tmp`; the sys.path-root, topological-order and base-comparability traps
 - [pirlo + francli dev loop](docs/pirlo-francli-dev-loop.md) — prerelease → pin → deploy (custom stack vs dev/staging) → francli pipeline green → destroy; custom-stack mechanics and DB topology
-- [feature-loop on OpenSpec](docs/feature-loop-openspec.md) — plan = one OpenSpec change per repo in its worktree, init if missing, rules via config.yaml (not a schema fork), scenarios = QA oracles, archive at hand-off
 - [work-monitor desktop pane mod](docs/work-monitor-desktop-mod.md) — Claude desktop side pane: sessions via `ccd_session_mgmt` MCP, MRs + head pipelines via one GitLab GraphQL query, token parsed from ~/.bashrc
 
 - [argocd charts per project / maldini prod roll](docs/argocd-charts-per-project-maldini-roll.md) — argocd is a group of per-chart projects; maldini prod = manual `feat/update-<ver>` chart MR bumping both image tags
