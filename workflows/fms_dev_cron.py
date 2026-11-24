@@ -11,7 +11,11 @@ import sys
 import time
 
 NAMESPACE = "football-metadata-service-dev"
-CRONJOBS = {"ingest-players", "refresh-images"}
+CRONJOBS = {
+    "ingest-metadata",
+    "refresh-images",
+    "ingest-players",
+}  # ingest-players: old name, until argocd !30 merges
 POLL_SECONDS = 15
 
 

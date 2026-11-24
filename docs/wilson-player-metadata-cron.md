@@ -7,7 +7,7 @@ verified_at: 2026-11-19
 # Wilson Heimspiel player metadata cron & source stamping
 
 The Heimspiel → player metadata sync lives in **wilson**, not FMS. FMS `python -m app.ingestion`
-(prod CronJob `ingest-players`, 10:00 Paris) is create-only into its own DB and ignores sources.
+(prod CronJob `ingest-metadata`, 10:00 Paris; was `ingest-players` before argocd !30) is create-only into its own DB and ignores sources.
 
 - Stamping: `son/models/player_metadata_source.py`. `PlayerMetadataSource` is OneToOne to `Player`
   (`player.metadata_source`), with one source per field. Defaults are first/last name = `skillcorner`

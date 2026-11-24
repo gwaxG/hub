@@ -73,7 +73,7 @@ kubectl auth can-i get pods -n football-metadata-service-dev</code></pre>
 <table>
 <tr><th>Resource</th><th>What it is</th><th>Source</th></tr>
 <tr><td><code>Deployment</code> + <code>Service</code></td><td>The FastAPI API (uvicorn) serving <code>/api/*</code></td><td>fastapi-base</td></tr>
-<tr><td><code>CronJob</code> <code>…-ingest-players</code></td><td>Daily player ingestion (mirror wilson + heimspiel enrich)</td><td>chart values <code>cronJobs</code></td></tr>
+<tr><td><code>CronJob</code> <code>…-ingest-metadata</code> (was <code>…-ingest-players</code> before argocd !30)</td><td>Daily ingestion: mirror wilson competitions, teams, players + heimspiel enrich + images of new entities</td><td>chart values <code>cronJobs</code></td></tr>
 <tr><td><code>Job</code> (pre-upgrade hook)</td><td><code>alembic upgrade head</code> — runs before each deploy</td><td>fastapi-base <code>dbMigration</code></td></tr>
 <tr><td><code>ServiceAccount</code></td><td>IRSA — grants the pods an AWS role (SSM / Secrets Manager / Aurora)</td><td>fastapi-base</td></tr>
 <tr><td><code>HTTPRoute</code>, <code>SecurityPolicy</code></td><td>Gateway API route for docs + Envoy JWT validation</td><td>our chart templates</td></tr>
@@ -101,14 +101,14 @@ kubectl rollout status deploy/&lt;app-deploy&gt; -n $NS    <span class="cmt"># i
 <p class="sub">Runs daily — dev <code>03:00 UTC</code>, prod <code>02:00 UTC</code>. Command: <code>python -m app.ingestion</code>. It mirrors wilson players (create-only) and enriches the newly-created heimspiel-matched ones.</p>
 <pre><code><span class="cmt"># find the exact (release-prefixed) name + schedule + last run</span>
 kubectl get cronjob -n $NS
-CJ=$(kubectl get cronjob -n $NS -o name | grep ingest-players)
+CJ=$(kubectl get cronjob -n $NS -o name | grep ingest-metadata)
 
 <span class="cmt"># trigger it NOW as a one-off Job (uses the exact cronjob spec: image, IRSA, env, resources)</span>
-kubectl create job -n $NS --from=$CJ ingest-players-manual-$(date +%s)
+kubectl create job -n $NS --from=$CJ ingest-metadata-manual-$(date +%s)
 
 <span class="cmt"># watch it</span>
-kubectl get jobs,pods -n $NS | grep ingest-players
-kubectl logs -n $NS job/ingest-players-manual-&lt;ts&gt; -f</code></pre>
+kubectl get jobs,pods -n $NS | grep ingest-metadata
+kubectl logs -n $NS job/ingest-metadata-manual-&lt;ts&gt; -f</code></pre>
 <div class="note">
 Expected log tail: <code>Ingest done: N created, M enriched, 0 failed</code>. Because ingestion is
 <b>create-only</b>, re-running after players already exist prints <code>created: 0</code> and enriches nothing
@@ -167,7 +167,7 @@ Exceptions that are safe &amp; ephemeral: creating a one-off <code>Job --from=cr
 <tr><td>Overview</td><td><code>kubectl get all -n $NS</code></td></tr>
 <tr><td>API logs</td><td><code>kubectl logs -n $NS deploy/&lt;app&gt; -f</code></td></tr>
 <tr><td>Find cron</td><td><code>kubectl get cronjob -n $NS</code></td></tr>
-<tr><td>Run ingestion now</td><td><code>kubectl create job -n $NS --from=cronjob/&lt;name&gt; ingest-players-manual-$(date +%s)</code></td></tr>
+<tr><td>Run ingestion now</td><td><code>kubectl create job -n $NS --from=cronjob/&lt;name&gt; ingest-metadata-manual-$(date +%s)</code></td></tr>
 <tr><td>Job logs</td><td><code>kubectl logs -n $NS job/&lt;job&gt; -f</code></td></tr>
 <tr><td>Why won't it start</td><td><code>kubectl describe pod &lt;pod&gt; -n $NS</code></td></tr>
 <tr><td>Reach API/metrics</td><td><code>kubectl port-forward -n $NS svc/&lt;svc&gt; 8080:80</code></td></tr>
