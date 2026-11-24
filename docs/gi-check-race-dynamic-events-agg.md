@@ -1,6 +1,7 @@
 ---
-repo: [football, wilson]
-verified_at: 2026-11-13
+repo: [football, skcr-utils, wilson]
+mr: [football!1734, skcr-utils!207]
+verified_at: 2026-11-24
 ---
 
 # GI check race: dynamic_events_agg reads dynamic_events_v2_check before wilson writes it
@@ -21,7 +22,21 @@ verified_at: 2026-11-13
   wilson relaunch / `dynamic_events_epv_historical_recompute` start it without any check → keep a DB fallback.
 - Same async-write pattern, lower risk (larger gap): `get_gi_quality_index` reads
   `tracking_extra_v3_*_quality_index`; `get_shot_goal_synchro_details` reads `gi_*_event_provider_used`.
-- Fix: football !1734 (`fix/gi-check-race-dynamic-events-agg`) — minutes SFN outputs `{gi_check_passed}` (QC
-  `dynamic_events_v3_check`, null when skipped) → GI v3/main pass it to dynamic_events_agg (optional input, Choice
-  IsPresent) → lambdas use it, else the DB. QA on mr-1734, match 2261 with DB forced False: outputs True 28/28.
-  Backfill since 2026-09-14 still to do after merge. Related: [GI v3 skip path](gi-v3-core-events-skipped-stale-gi.md).
+- Fix (football !1734 + skcr-utils !207): `minutes_and_quality_check` outputs `{gi_check_passed}` (QC
+  `dynamic_events_v3_check`, null when skipped) → GI v3 / main pass it to `dynamic_events_agg` (optional input,
+  Choice IsPresent, default null) → each of the 7 aggregate lambdas has a local payload field `gi_check_passed` and
+  calls ONE method, `AbstractFootballPipelineHandler.resolve_gi_check_passed(DataCollection, VideoDataCollection)`
+  (payload value, else the DB; son models injected because skcr-utils has no son dependency). Lambda locks pin the
+  skcr-utils prerelease until !207 is released (2.33.0), then repin.
+- QA (mr-1734, match 2261, dev): standalone and QC-skipped runs follow the DB; the clean proof is DB=True with the
+  real QC=False → outputs False (the SFN value wins; a DB read would give True). Not run: the inlined GI chain in
+  `main` (static only) and the `Core Events Skipped` path.
+- QC for 2261 returned False on 2026-11-24 but True on 2026-11-13 (cause not investigated; main moved 22 commits).
+  A QA oracle must compare with the QC value in the SFN history, not with an assumed True.
+- Prod backfill (read-only finder, 2026-11-24): source = prod S3 `skcr-football-data-raw-us-prod/gi/metrics/<key>/csv/
+  <match_id>.csv.gz` column `GI_METRICS_REP_5365` vs `api_datacollection.dynamic_events_v2_check` (maldini re-reads the
+  same S3 file). Of 19,627 matches since 2026-09-01: 151 output False/DB True (the bug), 4 reverse, 81 no DB check,
+  1,407 video matches without output by design (`skip_evaluation` skips aggregates when `video_provider` is set).
+  Rerun with `francli football run-sfn dynamic_events_agg --env prod --file <batch>` (50 ids per file) only after
+  !1734 is on prod, one batch at a time. Scripts and lists: `~/.cache/skillcorner-dev/race-dynamic-events-agg/backfill/`.
+  Related: [GI v3 skip path](gi-v3-core-events-skipped-stale-gi.md).

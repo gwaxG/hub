@@ -45,3 +45,6 @@ Encoded as the global `dev-workflow` skill (`~/.claude/skills/dev-workflow/SKILL
   never send to maldini, and its `football-domain-events-mr-<iid>` SNS topic has no subscribers (no async DB writes).
   A DB check can be forced on dev by invoking `wilson-apply_domain_events-dev` (eu-central-1) with an SQS-shaped
   domain event; restore with a later `occurred_at`. Run pirlo with `uvx --python 3.13` (3.14t fails building orjson).
+  Use the installed `/home/andrei/.local/bin/pirlo` (GITLAB_TOKEN exported): `uvx pirlo` without UV_DEFAULT_INDEX pulls
+  an unrelated public package. When re-forcing a dev DB check through `wilson-apply_domain_events-dev`, give each reset /
+  restore event an `occurred_at` later than the last GI event of that match (monotonic gate), or it is held back.
