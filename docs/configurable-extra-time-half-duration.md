@@ -1,7 +1,7 @@
 ---
 repo: [wilson, football, skcr-models, skcr-utils, skcr-football-utils, francli]
 mr: [skcr-models!86, skcr-utils!198, skcr-football-utils!101, francli!539, wilson!2856, football!1718]
-verified_at: 2026-11-17
+verified_at: 2026-11-23
 source: https://skillcorner.slack.com/archives/C04GQ2WFH6V/p1794211220857189
 ---
 
@@ -60,6 +60,28 @@ Youth competitions may also be affected — no list yet. Test matches: 2070668, 
   `check_periods_count` accepts only 2 or 4 period starts (`InconsistentNumberOfPeriodEvents`); Gaffer
   `gaffer/core/match_launch.py` warns on ET periods < `MIN_EXTRA_TIME_DURATION_MIN = 15`. Pipeline support for
   3 periods is unverified.
+
+## Golden goal in the 1st ET half = 3 periods (checked 2026-11-23, wilson main 014cee9bf)
+
+The merged work does not touch period count; a 3-period match is rejected by wilson. Instruction period
+events are start/end pairs + `@match` end: 2 periods = 4 events, 4 periods = 8, 3 periods = 6.
+- `Events.check_period_events_count` (`son/models/events.py`) accepts only 4 or 8 events → raises
+  `InconsistentNumberOfPeriodEvents`. Called by `Match.launch_metadata_checks` (pipeline checks, every
+  launch), `MatchCompletion.are_period_events_complete` (match stays incomplete) and Gaffer
+  `match_timeline_sync._validate_timeline` (timeline save → ValidationError).
+- `check_period_events_missing` requires period 3 end + period 4 start once there are > 4 events.
+- Custom-video path: `pipeline_checks/checks_core.check_periods_count` accepts 2 or 4 period starts.
+- Forest `has_correct_extra_time_events_or_raise` raises when only some of the 4 ET events exist.
+- Gaffer `_check_periods_duration`: ET period < 15 min is only a post-launch warning.
+- Golden goal in the 2nd ET half (4 periods, short period 4) passes all checks.
+- football (main c2cca638e): three SFNs pick the per-period Map list with a "Check number periods"
+  Choice on `video.json` `second_extra_time_period.start` only — null → `[1, 2]`, else `[1, 2, 3, 4]`.
+  A 3-period match takes `[1, 2]` and period 3 is silently not processed: `main/homography`,
+  `main/tracking_and_bih`, `standalone/relaunch_from_players_tracking_with_events/players_tracking`.
+  Fix = a 3rd branch on `first_extra_time_period` → `[1, 2, 3]`.
+- Other football lambdas look tolerant (iterate `period_1..4` and skip missing, offsets by period number,
+  minutes played uses available periods, QM/eks_sizing/wide-shot ratios use periods 1-2 only).
+  Per-period readers inside private libs (homography merge_parts, team recognition, CV, GI, physical) unverified.
 
 ## Implementation (merged 2026-11-17)
 
