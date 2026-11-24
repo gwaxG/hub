@@ -69,5 +69,9 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Find client IP by username](docs/find-client-ip-by-username.md) — no log has user+IP; join CloudWatch `request_log` (user) with CloudFront logs in `skcr-files-prod/cf-logs/` (IP, ~1 week) on time+path+params; WAL calls only show the WAL server IP (34.34.246.x)
 - [No video on S3 on dev](docs/no-video-on-s3-on-dev.md) — dev pipeline check falls back to legacy skcr-algo-dev mp4 when the vidic-v2 Video row wasn't copied
 
+## monitoring
+
+- [Grafana dashboards via Git Sync](docs/grafana-git-sync-dashboards.md) — Main org `git-sync-org-1` folder = GitLab grafana-dashboards repo; save in UI → MR, no approval; alerts and Sandbox stay out of git-sync folders
+
 ## cicd-catalogs
 - [cicd-release lint-mr-title runner tags](docs/cicd-release-lint-mr-title-runner-tags.md) — untagged job queued ~17 min on SaaS runners; `lint_tags` input (MR !95)
