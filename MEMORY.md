@@ -74,7 +74,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Football launch cron + processing pool](docs/football-launch-cron-processing-pool.md) — `_by_cron` = 1-match/min task_by_row over MatchBeating active flag; who sets it; future-match guard (wilson !2664, football !1575); ADR 0011 MatchBeating writes via launch_attempted event (wilson !2818) + son-pin-before-lambda rule
 - [Decommissioning a wilson lambda](docs/wilson-decommission-lambda.md) — lambdas created from their folder, so delete folder + CI build job + ECR by hand; prepare_preprod_for_match removed (wilson !2845); `_done` flag means "match fully created", keep it
 - [Wilson custom-stack lambda builds](docs/wilson-custom-stack-lambda-builds.md) — lambda_config environments (stack name + `other`) → regenerate lambda-builds.yml; prerelease via uv.lock only; hyphenated stack names
-- [Match S3 folder rename via SQS](docs/match-s3-folder-rename-outbox.md) — unique_name change → FIFO queue → edit_match_name_s3 lambda (retries + DLQ); publish after commit (wilson !2908)
+- [Match S3 folder rename via SQS](docs/match-s3-folder-rename-outbox.md) — unique_name change → FIFO queue → edit_match_name_s3 lambda (retries + DLQ); publish after commit (wilson !2908); team short-name rename on the same queue (!2965, open): stale-instance revert on double submit
 - [Find client IP by username](docs/find-client-ip-by-username.md) — no log has user+IP; join CloudWatch `request_log` (user) with CloudFront logs in `skcr-files-prod/cf-logs/` (IP, ~1 week) on time+path+params; WAL calls only show the WAL server IP (34.34.246.x)
 - [No video on S3 on dev](docs/no-video-on-s3-on-dev.md) — dev pipeline check falls back to legacy skcr-algo-dev mp4 when the vidic-v2 Video row wasn't copied
 

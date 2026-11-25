@@ -1,7 +1,7 @@
 ---
 repo: [wilson]
-mr: [wilson!2908]
-verified_at: 2026-11-18
+mr: [wilson!2908, wilson!2965]
+verified_at: 2026-11-25
 source: [https://app.notion.com/p/41a6552a98c98106b3d8de48e283cadc]
 ---
 
@@ -42,3 +42,24 @@ the team (Marthe) prefers queue + lambda (native retries + DLQ, where the stack 
 - `short_name` is a real field, empty in test fixtures: set it to test a team-change rename.
 - Run Django with `uv run python server/manage.py` from the wilson root + `AWS_PROFILE=Production.Skcr-Software-Common-Role`.
 - Forest and Django admin edits are not covered.
+
+## Team short-name rename on the same queue (wilson !2965, open on 2026-11-25, task 4325)
+
+A team short-name rename changes `unique_name` of every match of the team. !2965 replaces the fire-and-forget
+`edit_team_short_name` lambda (folder + CI build job deleted, ECR repos by hand) with a save in wilson:
+`gaffer.services.team_short_name.TeamShortNameRenamer.rename` and a deliberate copy in Forest,
+`api.forest.team.rename_team_short_name`. One atomic block: `select_for_update` on the team row, read old match
+names, save `short_name` + `short_name_en`, read new names, `MatchS3RenamePublisher.publish_all_if_renamed`
+(after commit, `SendMessageBatch` of 10, one FIFO group per match; stops at the first batch call that raises and
+logs the rest as `MatchS3RenamePublishFailed`). `SendMessageBatch` needs only `sqs:SendMessage`.
+
+- Review finding (head `e0071d25a`, reproduced locally): the no-op check reads the locked row, but the early
+  return leaves the caller's stale `team` untouched. In Gaffer `TeamUpdateSerializer.update` the full
+  `instance.save()` later writes the old short name back. A double submit of one rename therefore reverts the DB
+  name after the folders moved, with no message and no alert. Forest has no later save, so it is not affected.
+  Fix: lock and reload the team at the start of `update()`, or copy the locked names onto `team` before the return.
+- Accepted risks in the MR threads: renames of both teams of one match in parallel lock different rows and each
+  queue a move from the same old name (silent, source-missing is a 200 no-op); send order after commit is not
+  commit order.
+- `unique_name` uses `short_name_en` (`force_django_language('en')`); `short_name` follows the request language
+  (`LocaleMiddleware` is on), so the renamer saves both and a translated-only change moves no folder.
