@@ -34,7 +34,8 @@ to wilson `server/`.
   - Forest: `api/forest/match.py:2784` (refresh events from providers) and `:3126` (launch provider match creation)
     use `CompetitionMatching.objects.get(competition_id=..., provider=...)`. They raise `MultipleObjectsReturned`
     once a competition has 2 ids of that provider.
-  - son 0.103.0 release + repin of the 3 provider lambdas (they shipped pinned on `0.103.0a2+andreimitriakov`).
+  - Repin of the 3 provider lambdas (they shipped pinned on `0.103.0a2+andreimitriakov`). son 0.103.0 itself was
+    released by CI on the merge (tag `v0.103.0`, see [son release on merge](son-release-on-merge.md)).
 - **How it is enabled**: nothing in prod uses N ids yet. Extra mappings are added through the ORM or Django admin.
 - **Post-release**: 14 monitoring ticks (13:48Z–16:54Z) found no regression. Log at
   `~/.cache/skillcorner-dev/competition-1-to-n-mapping/monitor-log.md`. The early Heimspiel slowdown on large CEs was
