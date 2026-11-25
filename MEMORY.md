@@ -50,6 +50,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 ## wilson
 - [son release on merge](docs/son-release-on-merge.md) — wilson CI tags + publishes son when a merge to main bumps server/pyproject.toml; no pirlo release for finals; lambda repin stays manual
 - [Competition matching 1-to-N](docs/competition-matching-mapping.md) — wilson !2860: N provider ids per competition, fan-out via get_provider_competition_ids, earliest() scalar readers; open: Forest .get(), gaffer-front, lambda repin to son 0.103.0
+- [Provider CE matching rules and duplicates](docs/provider-ce-matching-rules-and-duplicates.md) — task 4110 vs main: how a provider match gets its CE, Heimspiel still filtered by competition matching, !2951 (N-to-1) contradicts "Heimspiel = CE only"
 
 - [Configurable extra time half duration](docs/configurable-extra-time-half-duration.md) — NCAA 2x45+2x10 ET; CE run-param field (migration 0288, default 15, 10 for shorter halves), pipeline payload incl. partial reruns; merged 2026-11-17; prerelease-pin lessons
 - [Wilson Cognito JIT migration](docs/wilson-cognito-jit-migration.md) — verify-credentials + lookup-user (X-Migration-Key, prod-only key); exact username vs iexact login
