@@ -84,4 +84,5 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Grafana dashboards via Git Sync](docs/grafana-git-sync-dashboards.md) — Main org `git-sync-org-1` folder = GitLab grafana-dashboards repo; save in UI → MR, no approval; alerts and Sandbox stay out of git-sync folders
 
 ## cicd-catalogs
+- [cicd-release accumulated release ("MergeBot")](docs/cicd-release-accumulated-release.md) — `prepare-release-mr` job keeps a standing `chore(release): vX.Y.Z` MR; feature MRs do not bump (skcr-models); a human merges the release MR; new optional event fields reach every consumer
 - [cicd-release lint-mr-title runner tags](docs/cicd-release-lint-mr-title-runner-tags.md) — untagged job queued ~17 min on SaaS runners; `lint_tags` input (MR !95)
