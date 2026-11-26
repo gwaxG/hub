@@ -42,8 +42,10 @@ Use the merge base to identify changes introduced by the branch.
 
 Do not silently include unrelated uncommitted changes.
 
-Identify the ticket from the branch name, commit messages, or user input.
-Do not invent ticket references.
+Identify the ticket from the branch name, commit messages, the conversation,
+or user input, and get its Notion URL. If only the ticket number or title is
+known, look the page up in Notion. If no ticket or URL is found, ask the user.
+Do not invent ticket references or URLs.
 
 ### 2. Establish verification evidence
 
@@ -79,7 +81,7 @@ Do not create, update, or submit an MR remotely unless explicitly asked.
 
 | Section | Rule |
 |---|---|
-| Why | 1–2 lines explaining the problem or goal, not the implementation. Reference the ticket or specification when available. |
+| Why | Always start with the ticket link on its own line: `[ticket](<Notion URL>)`. It must be the first Notion URL in the description (the work monitor reads that one). Write `No ticket` only when the user confirms there is none. Then 1–2 lines explaining the problem or goal, not the implementation. |
 | What changed | 2–6 concise bullets describing observable behavior. Explicitly mention relevant migrations, configuration changes, version bumps, and infrastructure changes. |
 | How it was verified | Report tests added, commands actually executed, observed results, inspected CI results, and tested environments. If no verification evidence exists, write "Not verified". |
 | Risk & rollback | Identify plausible failure modes, affected systems or users, observable symptoms, and recovery options. Distinguish verified rollback procedures from suggested ones. |
