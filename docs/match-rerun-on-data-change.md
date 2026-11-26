@@ -7,25 +7,35 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-26: MR open, deployed and QA'd on wilson dev at `8d7b435b8` (results in the MR description).
-Notion task 4412. Verify against the branch before use.
+State on 2026-11-26: MR open at head `a5fb23045`. Dev holds the earlier head `8d7b435b8`, where QA ran (results in
+the MR description). The rebase on `7f1039779`, the class refactor and the review fixes came after and were not
+redeployed. Notion task 4412. Verify against the branch before use.
 
 ## Design
 
 - A sensitive change on a `postmatch` match stamps `DataCollection.rerun_flagged_at` (migration
-  `0293_datacollection_rerun_flagged_at`, nullable). The status never changes. Matches in `''`,
+  `0294_datacollection_rerun_flagged_at`, nullable). The status never changes. Matches in `''`,
   `not_available` or `to_rerun` are left untouched.
 - `TO_RERUN` stays an operator state. The new path does not use it, and `mark_matches_to_rerun` and its
   callers (e.g. `replace_match_team`) are unchanged.
-- `son/rerun_schedule.py` holds both sides:
-  - `schedule_postmatch_matches_for_rerun(match_ids)`: callers run it on commit. Each call restarts the wait.
-  - `relaunch_quiet_scheduled_matches()`: relaunches `postmatch` rows with `rerun_flagged_at` older than
-    `QUIET_PERIOD` (3 h), requester `rerun_flagged_matches_sweep`, `direct_launch=True`.
+- `son/rerun_schedule.py` holds two classes:
+  - `RerunSchedule(launch=...)`: `add(match_ids)` (callers run it on commit; each call restarts the wait) and
+    `relaunch_due()` (postmatch rows with `rerun_flagged_at` older than `QUIET_PERIOD`, 3 h). The launcher is
+    injected, so tests pass a mock.
+  - `MatchRerun(match).launch()`: the default launcher. It launches the classic run (not for a custom-only match)
+    and one run per relaunchable custom feed, requester `rerun_flagged_matches_sweep`, `direct_launch=True`. It
+    tries every run, then raises `RerunLaunchError` once.
+- `son/custom_feed_relaunch.py`: `get_relaunchable_custom_feed_types`, `get_custom_video_kwargs_for_relaunch` and
+  `NOT_RELAUNCHABLE_STATUSES`, moved from `gaffer/core/match_launch.py` (which re-imports them). They only needed
+  son, so the son-only lambda can now rerun custom feeds. Tests that patch S3 or Vidic for these functions must
+  target `son.custom_feed_relaunch.*`.
 - The sweep clears the timestamp before the launch, with a compare-and-set on the value it read. A newer
   change keeps its schedule. A failed launch is logged and never retried.
 - Lambda `pulumi/aws/management/rerun_flagged_matches`: EventBridge `rate(1 hour)`, `maximum_retry_attempts: 0`
   (a retried async invoke would relaunch the same matches twice).
-- Any launch (`Match.launch_football_pipeline`) clears `rerun_flagged_at`.
+- Any other launch consumes the schedule in `Match._mark_full_run_accepted`, once the launch lambda accepts the
+  run and only for a timestamp older than the launch start. A rejected launch (`run_checks`) and a change made
+  during the launch keep the schedule. The same method resets the DE checks.
 
 ## Callers (all stopped relaunching inline)
 
@@ -46,10 +56,12 @@ Notion task 4412. Verify against the branch before use.
   `son>=0.104.1` like the sibling lambdas. Lock recipe that leaves a clean lock: `uv lock --prerelease=allow -P
   'son==<prerelease>'`, then `uv lock --prerelease=if-necessary-or-explicit` (removes the `[options]
   prerelease-mode` block, keeps the prerelease). Repin on the released son after the merge.
-- The sweep passes no custom video arguments. The old Forest action also relaunched custom video feeds
-  (`get_custom_video_kwargs_for_relaunch`); the sweep does not appear to.
-- Migration numbers move: main took 0291 and 0292 while the branch was open. Renumber and repoint
-  `dependencies` on each rebase; run the tests with `--create-db` after.
+- The sweep does not re-time the timeline from Vidic before a rerun; Gaffer `relaunch_matches` does.
+- Migration numbers move: main took 0291, 0292 and 0293 while the branch was open. Renumber and repoint
+  `dependencies` on each rebase; run the tests with `--create-db` after (also without `-n`: the single-process
+  test DB is a separate database and keeps the old migration name).
+- **Dev DB after a renumber:** dev applied the migration as `0293_datacollection_rerun_flagged_at`. The next dev
+  deploy of the branch fails on `0294` (column exists) until that `django_migrations` row is renamed.
 - `cicd/lambda-builds.yml` header count conflicts on each rebase: set it to the real `build:lambda` job count.
 
 ## QA on dev (2026-11-26), what it taught
@@ -71,7 +83,13 @@ Notion task 4412. Verify against the branch before use.
 - Dev matches used: 2070668 (postmatch, NCAA, substitutions, green pipeline), 2076621 (postmatch, only match in
   the stadium 8206 window from 2026-08-16), 2095661 (prematch). Both postmatch matches stay stamped on dev.
 - `lint-mr-title` (required job) rejects a `[proposal]` prefix: the MR title must start with the Conventional
-  Commit type.
+  Commit type. The job reads the title at pipeline creation, so start a new MR pipeline after a retitle.
+- Review threads: CodeRabbit summary comments are plain notes; a reply turns each into a thread that can be
+  resolved. The Pulumi preview bot edits its note and reopens its thread on every pipeline. The summary comment
+  can hold nitpicks that have no thread of their own.
+- Lineup sync sub-state flip (`was_sub != now_sub` deletes the player's events) must use the sheet view too. With
+  the stored role, a substitute who came on flipped on every save; without `timeline` in the payload the events
+  were not written back. A save without `timeline` still resets stored playing times (behaviour on main).
 - `QA_API_USER` / `QA_API_PASSWORD` are exported in `~/.bashrc`, which a non-interactive shell does not load.
 
 Related: [gaffer-lineup-swap-rerun](gaffer-lineup-swap-rerun.md),
