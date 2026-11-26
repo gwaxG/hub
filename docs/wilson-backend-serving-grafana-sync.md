@@ -1,7 +1,7 @@
 ---
 repo: [wilson, grafana-dashboards]
 mr: [grafana-dashboards!122, grafana-dashboards!132, grafana-dashboards!133, wilson!2967]
-verified_at: 2026-11-25
+verified_at: 2026-11-26
 ---
 
 # Wilson backend serving dashboard and alert rules
@@ -17,8 +17,9 @@ Where the Wilson backend serving dashboard and its alert rules live now, and how
   - *Wilson API health below 95%*: Athena on ALB logs, fires below 0.95 for 10 minutes.
   - *Wilson API 401/403 spike*: fires above 5,000 per 5-minute bucket for 10 minutes. The 7-day `/api/` baseline is median 161, p99 4,006, max 9,981.
   - Both route to contact point `sns-wilson-backend`, which publishes to SNS `wilson-backend-alerts-prod` (product-area backend Slack channel).
-- **Draft doc:** grafana-dashboards !133 still shows the old 200 threshold. Update it after the rules are verified.
-- **Not verified:** the Athena queries in the rules have not run in the evaluator, and no test notification reached SNS. The rules once disappeared without explanation, so check them again after any change in the session.
+- **Rule doc:** grafana-dashboards !133 records the live rules (rule uids `fg5aczw71s0sge`, `ag5aczwfxf11cd`, folder `eg5aczvyq47b4c`), checked against the API on 2026-11-26.
+- **State 2026-11-26:** both rules evaluate with health `ok` and state Normal. No test notification has reached SNS yet. The rules once disappeared without explanation, so check them through the API after any change.
+- **Evaluation state:** `fetch('/api/prometheus/grafana/api/v1/rules')` shows state, health and last error per rule.
 
 **How to check from a logged-in browser:** the Grafana UI often fails to load in the browser pane. Use the API instead:
 - `fetch('/api/v1/provisioning/alert-rules')` lists rules.
