@@ -1,6 +1,6 @@
 ---
 repo: [football, icebergkamp, wilson, wemby]
-mr: [wilson!2738, wilson!2838, wilson!2858, skcr-models!76]
+mr: [wilson!2738, wilson!2838, wilson!2858, wilson!2973, football!1772, skcr-models!76, skcr-models!96]
 verified_at: 2026-11-05
 ---
 
@@ -283,6 +283,20 @@ WHERE physical_v3_0_3_last_modified > now() - interval '7 days' GROUP BY 1;
   The `apply_domain_events` lambda lock (son 0.96.2, skcr-models 0.34.0) needs a relock or the mapping
   never runs. `PhysicalV4Status` is defined twice (`CustomTextChoices` and `TextChoices`).
 - As of 2026-11-10, main's subscription filter is still `anything-but playing_time.computed` (!2838 not merged).
+
+## 8c. wilson!2973 + football!1772: custom feed v4 columns (in review 2026-11-26)
+- A custom (alternate) feed never reaches ClickHouse, so `physical.loaded` never comes for it. Wilson serves its v4
+  from S3 (`server/physical_v4/custom_files.py`, `events_files.py`), and no reader gates on the v4 status columns.
+- football!1772 adds the `physical_v4_ready` lambda at the end of `football_physical_v4`. For a run with
+  `video_provider` it publishes `physical.ready` (`v4_0_0`, `match_physical_qi`, skcr-models 0.41.0). It needs only
+  the quality index file; a main match gets no event.
+- wilson!2973 maps that event (`video` block + `v4_0_0`) on `VideoDataCollection`: `physical_v4_0_*` and
+  `physical_events_v4_0_*` to `csv_ready` (new `PhysicalV4Status` value, migration 0293) with `occurred_at`, plus the QI.
+- Review gap: football `physical_v4` writes no events file when `outputs.events.empty` (`physical_v4/utils.py`
+  `delivery_payload`), but the mapping still moves the events columns; `/custom/physical_events/` then answers 404.
+- Deploy order: skcr-models 0.41.0, then wilson (contract is `extra='forbid'`), then football.
+- skcr-models 0.40 added three `pitch_size.*` events. Wilson has no mapping until !2950, so the consumer raises and
+  they wait in the DLQ (the subscription filter is still `anything-but playing_time.computed`).
 
 ## 9. Open questions / not verified
 - Whether `football-iceberg-datalake-dev/physical_agg_backfill_check` still exists. It is not in a catalog.
