@@ -25,7 +25,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const EMPTY: Snapshot = { usage: null, mergeRequests: [], errors: [], refreshedAt: 0 }
 const snapshot = atom({ plugin: 'work-monitor', key: 'snapshot' } as const, EMPTY, {
-  shape: 'snapshot-9',
+  shape: 'snapshot-10',
 })
 
 async function settle<T>(work: Promise<T>, label: string, errors: string[]): Promise<T | null> {
@@ -128,6 +128,11 @@ export const register: Register = on => {
           <Text wrap="truncate" dimColor={mr.isDraft}>
             {mr.title}
           </Text>,
+        )}
+        {mr.ticketUrl && (
+          <Text>
+            <Link href={mr.ticketUrl}>Notion</Link>
+          </Text>
         )}
         <Button key={`session-${place}-${mr.package}${mr.ref}`} label="Session" onPress={() => openOrigin($, mr)} />
       </Box>

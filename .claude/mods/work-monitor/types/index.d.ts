@@ -2,6 +2,8 @@ export type MergeRequestRow = {
   ref: string
   title: string
   url: string
+  /** The first Notion link in the MR description. */
+  ticketUrl: string | null
   isDraft: boolean
   isReview: boolean
   approvedBy: string[]

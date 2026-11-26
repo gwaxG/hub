@@ -28,6 +28,7 @@ const processes = (on: any) =>
 const mr = (iid: string, status: string) => ({
   iid,
   title: `Draft: change ${iid}`,
+  description: iid === '1' ? 'Part of [the ticket](https://app.notion.com/p/Some-ticket-3b26552a98c9). More text.' : 'Notion 4226, no link.',
   webUrl: `https://gitlab.com/g/repo/-/merge_requests/${iid}`,
   draft: true,
   project: { fullPath: 'g/repo' },
@@ -64,6 +65,9 @@ test('the pane lists active CI and merge requests', async ($, on) => {
     expect(await ui.find({ type: 'Text', text: /^change 1$/ })).toBeTruthy()
     expect(await ui.find({ type: 'Text', text: /^repo$/ })).toBeTruthy()
     expect((await ui.find({ type: 'Text', text: /^✓$/ }))?.text).toBe('✓')
+    // A Link's text is its href, then its label.
+    const tickets = (await ui.findAll({ type: 'Link', text: /Notion$/ })).map(link => link.props.href)
+    expect(tickets).toEqual(Array(2).fill('https://app.notion.com/p/Some-ticket-3b26552a98c9'))
     await ui.press({ key: 'session-mine-repo!1' })
     expect(opened.at(-1)).toBe('claude://claude.ai/epitaxy/local_1')
     await ui.press({ key: 'session-mine-repo!2' })

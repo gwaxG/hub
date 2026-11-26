@@ -3,10 +3,12 @@ import type { EngineInterface } from 'claude-code'
 import type { MergeRequestRow } from '../types'
 
 const GITLAB = 'https://gitlab.com'
+// The ticket link an MR description carries; no dot in the path, so a sentence's full stop stays out.
+const NOTION_URL = /https:\/\/(?:www\.)?(?:notion\.so|app\.notion\.com)\/[\w\-/?=&%#]+/
 
 const MR_QUERY = `
 fragment mr on MergeRequest {
-  iid title webUrl draft project { fullPath } headPipeline { status path } approvedBy { nodes { username } }
+  iid title description webUrl draft project { fullPath } headPipeline { status path } approvedBy { nodes { username } }
 }
 { currentUser {
   authored: authoredMergeRequests(state: opened, first: 40, sort: UPDATED_DESC) { nodes { ...mr } }
@@ -16,6 +18,7 @@ fragment mr on MergeRequest {
 type GitlabMr = {
   iid: string
   title: string
+  description: string | null
   webUrl: string
   draft: boolean
   project: { fullPath: string }
@@ -40,6 +43,7 @@ function toRow(mr: GitlabMr, isReview: boolean): MergeRequestRow {
     package: mr.project.fullPath.split('/').pop() ?? mr.project.fullPath,
     title: mr.title.replace(/^Draft:\s*/i, ''),
     url: mr.webUrl,
+    ticketUrl: NOTION_URL.exec(mr.description ?? '')?.[0] ?? null,
     isDraft: mr.draft,
     isReview,
     approvedBy: mr.approvedBy.nodes.map(user => user.username),
