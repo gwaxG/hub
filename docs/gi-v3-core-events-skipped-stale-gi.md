@@ -33,7 +33,7 @@ verified_at: 2026-11-26
   bumps `DataCollection.last_modified` and invokes the `replace_player_in_data` lambda (eu-central-1),
   which rewrites the ids in S3 for each match where the old player played. No full relaunch is needed.
 - **Fix: not merged yet.** wilson!2829 was closed on 2026-11-26; the reset commit now sits on branch
-  `feat/relaunch-matches-on-data-change` (task 4412, see
+  `feat/relaunch-matches-on-data-change` (wilson !2981, open, task 4412, see
   [gaffer-lineup-swap-rerun](gaffer-lineup-swap-rerun.md)). wilson!2830 was closed earlier and folded into !2829;
   Notion ticket 4108 is Done. The football skip path itself is unchanged and still re-aggregates stale CSVs.
 - The reset (`son/models/match.py::_reset_dynamic_events_checks`): once the launch lambda accepts a full run,

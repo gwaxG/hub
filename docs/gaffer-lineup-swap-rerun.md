@@ -1,6 +1,6 @@
 ---
 repo: [wilson]
-mr: [wilson!2829]
+mr: [wilson!2829, wilson!2981]
 verified_at: 2026-11-26
 source: https://skillcorner.slack.com/archives/C04GQ2WFH6V/p1793813798830259
 ---
@@ -14,7 +14,7 @@ source: https://skillcorner.slack.com/archives/C04GQ2WFH6V/p1793813798830259
   2049183 and 2044041, both never relaunched.
 - **!2829 was closed unmerged on 2026-11-26** and its branch deleted (commits stay on
   `refs/merge-requests/2829/head`). Its work moved to branch `feat/relaunch-matches-on-data-change`
-  (Notion task 4412, no MR yet on 2026-11-26). There `sync_match_lineup` returns True on any sheet change
+  (Notion task 4412, wilson !2981, open). There `sync_match_lineup` returns True on any sheet change
   (add, remove, edit) and the save schedules a postmatch match through `son/rerun_schedule.py`
   (`rerun_flagged_at`, hourly sweep lambda, 3 h quiet period). The status never becomes `TO_RERUN` and
   there is no operator warning. The `TO_RERUN` flag + `lineup_changed_match_to_rerun` warning below were
