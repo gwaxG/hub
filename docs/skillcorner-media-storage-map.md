@@ -56,10 +56,11 @@ Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. It replaces t
 
 - **Why:** FMS matchings were a create-only snapshot of wilson, and images were keyed by our id. A matching fixed or removed in wilson, or a merged duplicate, never reached FMS.
 - **Keys:** `assets/heimspiel/player/photo/{person_id}.jpg`, `assets/heimspiel/team/logo/{team_id}.png`, `assets/heimspiel/competition/logo/{competition_id}.png` (bare digits). The old keys and the `has_*` columns stay, unread and unwritten, until the Hub switch.
-- **Weekly job** `python -m app.images [--type T] [--competition ID ...]` lists from HEIMSPIEL through data-provider-clients (≥ 1.14.0 for `is_placeholder`), no DB and no son:
+- **Weekly job** `python -m app.images [--type T] [--competition ID ...]` lists from HEIMSPIEL through data-provider-clients (≥ 1.14.0 for `is_placeholder`), without son:
   - logos of every football competition (`/competition-list/`, sport id 1) and of its non-placeholder teams (`/teams-by-season/co{id}/`);
   - photos of the `role.group == 'Athletes'` squad entries (`/team-squad/te{id}/`, id = `person.id`) of `settings.HEIMSPIEL_PHOTO_COMPETITION_IDS` (the 20 contract ids; 9 extension ids wait for the contract);
-  - `--competition` replaces the scope of the logos; photos are always intersected with the contract list;
+  - on a run without `--competition`, the logo scope also takes the HEIMSPIEL ids matched in FMS (`team_matching`, `competition_matching`), read once from the DB at the start of the run. Reason (review of !29): 471 of the 3,266 matched prod teams were outside the current listing and 322 of them had a logo; all 198 matched competitions were listed;
+  - `--competition` replaces the scope of the logos and adds no matched id; photos are always intersected with the contract list;
   - each feed is read once per run, retried once, and a failure makes the job exit 1 without stopping the run; nothing is deleted from S3;
   - log lines `Photo report competition=co37 in_scope=… with_photo=… without_photo=… failed=…` and `Photo report total distinct_persons=… feed_failures=N` give the counts for the contract owner.
 - **Read:** `GET /api/images/{type}/{our_id}` resolves our id through the FMS HEIMSPIEL matching row at request time. No row or no object → the same 404. The client contract is unchanged.
@@ -73,8 +74,9 @@ Facts measured on 2026-11-27:
 - **"No season logic" has a cost:** `/teams-by-season/co{id}/` returns HEIMSPIEL's current season only. MLS (co73) returned its 18 playoff clubs, not 30. The product owner accepted this.
 - Champions League (co19) lists the 36 league-phase clubs; 5 were outside the contract countries. All are in the photo scope (decision).
 - Photo coverage: co37 521 of 542, co19 1,067 of 1,197, co73 232 of 589. About 29 athletes per squad, so about 10,000 persons for the 20 leagues.
+- **An MR author cannot approve the own MR** in this project (API 401, `user_can_approve: false`); no approval is required to merge, only resolved threads.
 - **The JSON feeds answer without credentials.** The FMS IRSA role cannot read `/HEIMSPIEL_USERNAME` / `/HEIMSPIEL_PASSWORD` (eu-central-1); dpc logs `Unable to retrieve AWS variable` twice and the calls still succeed.
-- Not run before prod: the uncapped listing (all 234 competitions for team logos, the 20 contract competitions for photos).
+- The full team listing was read once, read-only: 234 feed calls in 17 s, no failure, 3,379 distinct teams. Not run before prod: a full image run (team logos of the listing plus the matched ids, photos of the 20 contract competitions).
 - Follow-ups: an `enriched_heimspiel_id` marker (a failed fetch is not retried until the matching changes again; a DB error on one profile stops the enrichment of the rest of the run); nobody reads the images yet (see below); what the 12,000-photo cap counts is a question for the contract owner.
 
 QA and CI traps:
