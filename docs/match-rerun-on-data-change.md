@@ -125,8 +125,8 @@ DB reads (`rerun_flagged_at`, statuses) are still pending, see the MR descriptio
 - The dev Aurora (port 5432) is only reachable from the office network or the VPN. From a home network the
   Django shell fails with `OperationalError: connection timeout expired` while the dev API and AWS calls still
   work. Plan DB checkpoints for a day with that access, or run them before the sweep clears the stamps.
-- GitLab resolves a diff thread by itself when a push changes its lines (shown as resolved by the pusher): four
-  of the seven human threads closed that way; the other three stayed open for the reviewer.
+- After the fix push, four of the seven human threads showed as resolved by the author although the session
+  only replied. Cause not verified: either GitLab's auto-resolve of outdated diff threads, or a manual resolve.
 - The local test Postgres container (`wilson-test-pg`) does not restart with the machine: `docker start
   wilson-test-pg` when tests fail with "connection refused" on 5432.
 
