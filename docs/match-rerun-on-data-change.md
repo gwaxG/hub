@@ -8,8 +8,8 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 # Match rerun after a sensitive data change (wilson !2981, open)
 
 State on 2026-11-27: MR open at head `81ff3035c`, lambda locked on son `0.105.0a4+andreimitriakov`, deployed on
-wilson dev. QA at that head: API saves and the sweep pass (it relaunched `[2076621, 2070668]`, oldest first); the
-DB reads (`rerun_flagged_at`, statuses) are still pending, see the MR description. Notion task 4412. Verify against the branch before use.
+wilson dev. QA at that head passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
+(oldest first) and cleared their stamps; details in the MR description. Dev keeps `2095661` (prematch) stamped. Notion task 4412. Verify against the branch before use.
 
 ## Design
 
