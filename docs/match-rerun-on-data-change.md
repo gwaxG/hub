@@ -7,8 +7,9 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-27: MR open at head `baf692c75`, lambda locked on son `0.105.0a6+andreimitriakov`. Dev still runs
-`81ff3035c` (son `0.105.0a4`, before the stadium lookup skip and the cron stadium step change). QA at `81ff3035c` passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
+State on 2026-11-27: MR open at head `d5611dac1`, lambda locked on son `0.105.0a7+andreimitriakov`. Dev still runs
+`81ff3035c` (son `0.105.0a4`): the later changes (no stadium lookup in the sweep, cron stadium step, Gaffer duplicate merge,
+Forest stadium action, `add_to_queue`) have unit tests only. QA at `81ff3035c` passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
 (oldest first) and cleared their stamps; details in the MR description. Dev keeps `2095661` (prematch) stamped. Notion task 4412. Verify against the branch before use.
 
 ## Design
@@ -66,11 +67,16 @@ State on 2026-11-27: MR open at head `baf692c75`, lambda locked on son `0.105.0a
   `MatchRelaunchAfterStadiumUpdateFailed` and `_STADIUM_UPDATE_REQUESTER` are removed). The cron step has no
   transaction, so it calls `add` directly. The audit row says `stadium changed post-processing, rerun scheduled`.
 
-Still immediate on the branch, not on the schedule: Gaffer duplicate player cluster merge
-(`DuplicateResolutionService.resolve_cluster_merge`: `mark_matches_to_rerun` + `relaunch_matches`), Forest
-stadium "add dimensions" with relaunch (`_relaunch_related_matches`, `add_to_queue`), Forest pipeline status
-relaunch (`add_to_queue`). `add_to_queue` invokes the online pool lambda directly, not
-`launch_football_pipeline`, so it never clears `rerun_flagged_at`.
+- Gaffer duplicate player cluster merge (`DuplicateResolutionService.resolve_cluster_merge`, `f210c4aad`):
+  schedules on commit, always `200` / `merged` with an empty launch summary, `user_email` argument removed; the
+  preview lists postmatch matches (custom-only ones only while a feed is left).
+- Forest stadium "add dimensions" with relaunch (`_schedule_related_matches`, `8c9a24916`): schedules the played
+  matches of the window on commit (the action runs in `transaction.atomic`).
+- Forest pipeline status relaunch stays immediate (a manual relaunch). `MatchQuerySet.add_to_queue` now clears
+  `rerun_flagged_at` older than the call once the `set_matches_to_retry_online` lambda accepts it, except for
+  matches with custom videos. That lambda sets `to_rerun`, deletes the data and puts the match in the
+  processing pool. With an `Event` invocation, "accepted" is before the lambda ran: a per-match failure there
+  loses the schedule.
 
 ## Traps found during the rebase and the !2829 merge-in
 
