@@ -50,6 +50,16 @@ Status 2026-11-20: FMS !24, client !10, argocd !30 open as drafts; QA passed on 
 - **fitrequest generated methods** drop the response content type and raise on 404; the client's `get_image` is written by hand on `self.session.synchronous` with `self.session.base_url` (that httpx client has no base_url).
 - **HEIMSPIEL re-encodes player photos on a CDN miss:** after Cloudflare's 4 h cache expires, the origin may return different bytes for the same photo, so a weekly refresh still rewrites part of the photos (dev QA: 73/93, then 0/93 with a warm cache). Logos were stable.
 
+## Findings for task 4435 (store by HEIMSPIEL id, 2026-11-27, FMS main at bdd8d18)
+
+Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. State of the code before any change:
+
+- **FMS matchings are a create-only snapshot.** `player_matching` / `team_matching` / `competition_matching` are written only by `create_matching` for entities absent from FMS. A matching fixed or removed in wilson, or a merged duplicate, never reaches FMS. Read-time resolution "our id → HEIMSPIEL id → key" needs a matching sync first.
+- **No inventory of stored images.** Only the three `has_*` flags exist (alembic head 003), and the IRSA role has no `s3:ListBucket`. Counts of stored / missing images need a HEAD per key, a ListBucket statement in the FMS pulumi stack, or a new table.
+- **dpc already wraps the three listing feeds** (`get_competition_list`, `get_teams_by_competition`, `get_team_squad`); `Role.group`, `Person.id` and the sport id are exposed. `get_teams_by_competition` does not filter placeholder teams (`is_placeholder`, dpc ≥ 1.14.0; FMS locks 1.12.2). The dpc client has no retry, cache or rate limit.
+- **No consumer of the images yet.** Orion imports the FMS client only for `get_player`; nothing in orion or orion-front calls `get_image` or reads the bucket. The ticket's "the Hub reads S3 directly" has no evidence in the mirrored repos.
+- `get_image(image_type, entity_id)` takes our id, so server-side resolution needs no client release.
+
 ## What orion takes today
 
 - Orion schemas declare nullable `logo_url`, `team_logo_url`, `competition_logo_url`, `photo_url`. Repositories still set them to null (TODO "no source yet"). Wiring them to FMS `get_image` is the next step, outside task 4293's FMS scope.
