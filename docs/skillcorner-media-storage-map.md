@@ -1,7 +1,7 @@
 ---
 repo: [football-metadata-service, football-metadata-service-client, argocd, orion, orion-front, vidic-client]
 mr: [football-metadata-service!24, football-metadata-service-client!10, argocd-platform-services-football-metadata-service!30, argocd-platform-services-football-metadata-service!32]
-verified_at: 2026-11-23
+verified_at: 2026-11-27
 source: https://app.notion.com/p/41b6552a98c980beb00dfdcb2d140dca
 ---
 
