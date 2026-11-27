@@ -50,9 +50,9 @@ Status 2026-11-20: FMS !24, client !10, argocd !30 open as drafts; QA passed on 
 - **fitrequest generated methods** drop the response content type and raise on 404; the client's `get_image` is written by hand on `self.session.synchronous` with `self.session.base_url` (that httpx client has no base_url).
 - **HEIMSPIEL re-encodes player photos on a CDN miss:** after Cloudflare's 4 h cache expires, the origin may return different bytes for the same photo, so a weekly refresh still rewrites part of the photos (dev QA: 73/93, then 0/93 with a warm cache). Logos were stable.
 
-## Task 4435: images stored by HEIMSPIEL id (FMS !29, chart !43, open drafts 2026-11-27)
+## Task 4435: images stored by HEIMSPIEL id (FMS !29 + chart !43, merged and on prod 2026-11-27)
 
-Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. It replaces the task 4293 logic above once !29 merges; QA passed on dev (capped to co37, co19, co73).
+Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. It replaces the task 4293 logic above: !29 merged as `a948b3fe`, prod image `1.0.0-a948b3fe`; QA passed on dev (capped to co37, co19, co73).
 
 - **Why:** FMS matchings were a create-only snapshot of wilson, and images were keyed by our id. A matching fixed or removed in wilson, or a merged duplicate, never reached FMS.
 - **Keys:** `assets/heimspiel/player/photo/{person_id}.jpg`, `assets/heimspiel/team/logo/{team_id}.png`, `assets/heimspiel/competition/logo/{competition_id}.png` (bare digits). The old keys and the `has_*` columns stay, unread and unwritten, until the Hub switch.
@@ -76,7 +76,10 @@ Facts measured on 2026-11-27:
 - Photo coverage: co37 521 of 542, co19 1,067 of 1,197, co73 232 of 589. About 29 athletes per squad, so about 10,000 persons for the 20 leagues.
 - **An MR author cannot approve the own MR** in this project (API 401, `user_can_approve: false`); no approval is required to merge, only resolved threads.
 - **The JSON feeds answer without credentials.** The FMS IRSA role cannot read `/HEIMSPIEL_USERNAME` / `/HEIMSPIEL_PASSWORD` (eu-central-1); dpc logs `Unable to retrieve AWS variable` twice and the calls still succeed.
-- The full team listing was read once, read-only: 234 feed calls in 17 s, no failure, 3,379 distinct teams. Not run before prod: a full image run (team logos of the listing plus the matched ids, photos of the 20 contract competitions).
+- **First prod runs (manual, 2026-11-27):**
+  - `ingest-metadata`: 40 min. Player matchings `3058 removed | 41965 added` (61,040 → 99,947: the create-only snapshot had missed about 42,000 matchings), 41,964 profiles fetched, 1 failed (HEIMSPIEL 502). Teams `2 | 2`, competitions `0 | 0`. Later runs fetch the daily changes only.
+  - `refresh-images`: 6 min, 0 failed, 0 feed failures. Photos: 10,397 distinct athletes of the 20 contract competitions, 7,421 stored (71 %), 2,976 missing. Team logos: 3,379 listed + 471 added from the matchings, 3,141 stored, 709 missing. Competition logos: 176 of 234.
+- **Prod deploy path:** merge to main → CI auto-merges a `bump prod image tag` MR in the chart → ArgoCD auto-syncs within about 2 minutes (no manual sync).
 - Follow-ups: an `enriched_heimspiel_id` marker (a failed fetch is not retried until the matching changes again; a DB error on one profile stops the enrichment of the rest of the run); nobody reads the images yet (see below); what the 12,000-photo cap counts is a question for the contract owner.
 
 QA and CI traps:
