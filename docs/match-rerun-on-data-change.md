@@ -7,8 +7,8 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-27: MR open at head `b871e87f3`, lambda locked on son `0.105.0a5+andreimitriakov`. Dev still runs
-`81ff3035c` (son `0.105.0a4`, before the stadium lookup skip). QA at `81ff3035c` passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
+State on 2026-11-27: MR open at head `baf692c75`, lambda locked on son `0.105.0a6+andreimitriakov`. Dev still runs
+`81ff3035c` (son `0.105.0a4`, before the stadium lookup skip and the cron stadium step change). QA at `81ff3035c` passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
 (oldest first) and cleared their stamps; details in the MR description. Dev keeps `2095661` (prematch) stamped. Notion task 4412. Verify against the branch before use.
 
 ## Design
@@ -60,6 +60,17 @@ State on 2026-11-27: MR open at head `b871e87f3`, lambda locked on son `0.105.0a
   matches only (`get_schedulable_impacted_match_ids`).
 - `merge_teams` command: no longer sets `TO_RERUN`; it schedules on commit, so a dry run schedules nothing.
 - Forest player duplicate removal: reports "scheduled to rerun".
+- Heimspiel metadata cron (ECS `update_matches_metadata`), stadium step in `son/clients/provider/match_utils.py`:
+  a processed match whose Heimspiel venue has other pitch dimensions is scheduled (`fd8dc450c`, decided
+  2026-11-27). It used to set `TO_RERUN` and launch at once (`_relaunch_after_stadium_update`,
+  `MatchRelaunchAfterStadiumUpdateFailed` and `_STADIUM_UPDATE_REQUESTER` are removed). The cron step has no
+  transaction, so it calls `add` directly. The audit row says `stadium changed post-processing, rerun scheduled`.
+
+Still immediate on the branch, not on the schedule: Gaffer duplicate player cluster merge
+(`DuplicateResolutionService.resolve_cluster_merge`: `mark_matches_to_rerun` + `relaunch_matches`), Forest
+stadium "add dimensions" with relaunch (`_relaunch_related_matches`, `add_to_queue`), Forest pipeline status
+relaunch (`add_to_queue`). `add_to_queue` invokes the online pool lambda directly, not
+`launch_football_pipeline`, so it never clears `rerun_flagged_at`.
 
 ## Traps found during the rebase and the !2829 merge-in
 
