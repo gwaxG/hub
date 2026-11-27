@@ -7,35 +7,45 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-26: MR open at head `f35b9e2ab`, deployed on wilson dev and QA'd there (results in the MR
-description). Lambda locked on son `0.105.0a3+andreimitriakov`. Notion task 4412. Verify against the branch before use.
+State on 2026-11-27: MR open at head `81ff3035c`, lambda locked on son `0.105.0a4+andreimitriakov`. Dev holds
+`f35b9e2ab` (QA of 2026-11-26, results in the MR description); the human review changes of 2026-11-27 are not
+deployed. Notion task 4412. Verify against the branch before use.
 
 ## Design
 
-- A sensitive change on a `postmatch` match stamps `DataCollection.rerun_flagged_at` (migration
-  `0294_datacollection_rerun_flagged_at`, nullable). The status never changes. Matches in `''`,
-  `not_available` or `to_rerun` are left untouched.
-- `TO_RERUN` stays an operator state. The new path does not use it, and `mark_matches_to_rerun` and its
-  callers (e.g. `replace_match_team`) are unchanged.
-- `son/rerun_schedule.py` holds two classes:
-  - `RerunSchedule(launch=...)`: `add(match_ids)` (callers run it on commit; each call restarts the wait) and
-    `relaunch_due()` (postmatch rows with `rerun_flagged_at` older than `QUIET_PERIOD`, 3 h). The launcher is
-    injected, so tests pass a mock.
-  - `MatchRerun(match).launch()`: the default launcher. It launches the classic run (not for a custom-only match)
-    and one run per relaunchable custom feed, requester `rerun_flagged_matches_sweep`, `direct_launch=True`. It
-    tries every run, then raises `RerunLaunchError` once.
+- A sensitive change stamps `DataCollection.rerun_flagged_at` (migration `0294_datacollection_rerun_flagged_at`,
+  nullable) on every match except a `not_available` one. The status never changes. Stamping matches that are not
+  `postmatch` yet keeps a change made while a run is in flight (first run, `to_rerun` relaunch): the sweep only
+  relaunches `postmatch` matches, so it picks the match up when its run ends. Decided in review on 2026-11-27;
+  the ticket first said "postmatch only".
+- `TO_RERUN` stays an operator state. A sensitive change never sets it. A failed sweep run does: the classic
+  `DataCollection`, or the `VideoDataCollection` of the failed custom feed, so operators see it in Gaffer and
+  relaunch. `mark_matches_to_rerun` and its callers are unchanged.
+- `son/rerun_schedule.py`:
+  - `RerunSchedule(launch=...)`: `schedulable(match_ids)` (what `add` would stamp), `add(match_ids)` (callers run
+    it on commit; each call restarts the wait) and `relaunch_due(has_time)` (postmatch rows older than
+    `QUIET_PERIOD`, 2 h, oldest first; stops when `has_time()` is false, the matches left keep their schedule).
+    It returns a `SweepResult` (relaunched and failed match ids). The launcher is injected, so tests pass a mock.
+  - `MatchRerun(match).launch()`: the default launcher. One `PipelineRun` for the classic run (not for a
+    custom-only match) and one per relaunchable custom feed, requester `rerun_flagged_matches_sweep`,
+    `direct_launch=True`. It tries every run, hands a failed one to the operators, then raises once.
 - `son/custom_feed_relaunch.py`: `get_relaunchable_custom_feed_types`, `get_custom_video_kwargs_for_relaunch` and
   `NOT_RELAUNCHABLE_STATUSES`, moved from `gaffer/core/match_launch.py` (which re-imports them). They only needed
   son, so the son-only lambda can now rerun custom feeds. Tests that patch S3 or Vidic for these functions must
   target `son.custom_feed_relaunch.*`.
 - The sweep clears the timestamp before the launch, with a compare-and-set on the value it read. A newer
-  change keeps its schedule. A failed launch is logged and never retried.
-- Lambda `pulumi/aws/management/rerun_flagged_matches`: EventBridge `rate(1 hour)`, `maximum_retry_attempts: 0`
-  (a retried async invoke would relaunch the same matches twice).
+  change keeps its schedule. A failed launch is never retried (a match that always fails would loop).
+- Lambda `pulumi/aws/management/rerun_flagged_matches`: EventBridge `rate(15 minutes)`, timeout 900 s,
+  `maximum_retry_attempts: 0` (a retried async invoke would relaunch the same matches twice). Two sweeps can
+  overlap; the compare-and-set claim launches a match once. It stops taking matches when under 3 min are left.
+  It sets up Sentry (`SentryTracing`) and raises `RelaunchFailed` at the end when a relaunch failed. The CloudWatch
+  alarm paulumi creates for an EventBridge lambda only watches failed invocations of the rule, not function
+  errors, so Sentry is the alert channel.
 - Any other launch consumes the schedule in `Match._mark_full_run_accepted`, once the launch lambda accepts the
   run and only for a timestamp older than the launch start. A rejected launch (`run_checks`) and a change made
   during the launch keep the schedule. A match with custom videos keeps it on any such launch (one run does not
-  refresh all its outputs); only the sweep clears it. The same method resets the DE checks.
+  refresh all its outputs); only the sweep clears it. The same method resets the DE checks: on the `DataCollection` for a classic run, on
+  the feed's `VideoDataCollection` for a custom feed run (a custom run does not regenerate the classic DE).
 
 ## Callers (all stopped relaunching inline)
 
@@ -77,7 +87,8 @@ description). Lambda locked on son `0.105.0a3+andreimitriakov`. Notion task 4412
 - No endpoint exposes `rerun_flagged_at` or the DE checks: check them with a Django shell on the dev DB
   (`SKILLCORNER_ENV=dev DJANGO_SETTINGS_MODULE=wilson.settings_local .venv/bin/python server/manage.py shell`).
 - The EventBridge schedule exists on prod only. On dev, invoke `wilson-rerun_flagged_matches-dev` (eu-central-1)
-  by hand, after a DB backdate of `rerun_flagged_at` (more than 3 h).
+  by hand, after a DB backdate of `rerun_flagged_at` (more than the quiet period). Check what is due first: on
+  2026-11-27 dev still has `2070668` and `2076621` stamped, so a sweep would start two football runs.
 - Sweep cold start: Lambda init hits the 10 s init limit, the first invoke took 57 s. boto3's 60 s read timeout
   retried the invoke; the retry returned `[]` (compare-and-set held), so `qa_run.py` reported a false failure.
   Invoke with `AWS_MAX_ATTEMPTS=1 aws lambda invoke --cli-read-timeout 600 ...` to get the real answer.
@@ -102,6 +113,17 @@ description). Lambda locked on son `0.105.0a3+andreimitriakov`. Notion task 4412
   the stored role, a substitute who came on flipped on every save; without `timeline` in the payload the events
   were not written back. A save without `timeline` still resets stored playing times (behaviour on main).
 - `QA_API_USER` / `QA_API_PASSWORD` are exported in `~/.bashrc`, which a non-interactive shell does not load.
+
+## Human review of 2026-11-27 (Marthe Brandam), open points
+
+- Product alignment still to confirm: a rerun hides the DE of the match until its GI quality check (about 1 h),
+  and for good if the run fails before it.
+- Follow-up MRs, not in !2981: expose `rerun_flagged_at` on the Gaffer match response; gaffer-front wording
+  (stadium modal still says "Update and relaunch", lineup save says nothing).
+- The sweep calls `update_stadium` (a Heimspiel call) for each launch, as `relaunch_matches` does;
+  `block_preprocessing_gate=True` was offered to the reviewer as an option.
+- The local test Postgres container (`wilson-test-pg`) does not restart with the machine: `docker start
+  wilson-test-pg` when tests fail with "connection refused" on 5432.
 
 Related: [gaffer-lineup-swap-rerun](gaffer-lineup-swap-rerun.md),
 [gi-v3-core-events-skipped-stale-gi](gi-v3-core-events-skipped-stale-gi.md),
