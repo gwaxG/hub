@@ -1,14 +1,14 @@
 ---
 repo: [wilson]
 mr: [wilson!2981, wilson!2829]
-verified_at: 2026-11-26
+verified_at: 2026-11-27
 source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 ---
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-27: MR open at head `81ff3035c`, lambda locked on son `0.105.0a4+andreimitriakov`, deployed on
-wilson dev. QA at that head passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
+State on 2026-11-27: MR open at head `b871e87f3`, lambda locked on son `0.105.0a5+andreimitriakov`. Dev still runs
+`81ff3035c` (son `0.105.0a4`, before the stadium lookup skip). QA at `81ff3035c` passes, with DB reads: a prematch match is stamped, the sweep relaunched `[2076621, 2070668]`
 (oldest first) and cleared their stamps; details in the MR description. Dev keeps `2095661` (prematch) stamped. Notion task 4412. Verify against the branch before use.
 
 ## Design
@@ -28,7 +28,11 @@ wilson dev. QA at that head passes, with DB reads: a prematch match is stamped, 
     It returns a `SweepResult` (relaunched and failed match ids). The launcher is injected, so tests pass a mock.
   - `MatchRerun(match).launch()`: the default launcher. One `PipelineRun` for the classic run (not for a
     custom-only match) and one per relaunchable custom feed, requester `rerun_flagged_matches_sweep`,
-    `direct_launch=True`. It tries every run, hands a failed one to the operators, then raises once.
+    `direct_launch=True`, `block_preprocessing_gate=True`. It tries every run, hands a failed one to the
+    operators, then raises once.
+  - A sweep rerun does not call `Match.update_stadium` (decided on 2026-11-27, `f8282451a`): it processes the
+    stadium the match already has, with no Heimspiel lookup per launch. Without the flag,
+    `launch_football_pipeline` resolves the stadium on every launch, on any env and status.
 - `son/custom_feed_relaunch.py`: `get_relaunchable_custom_feed_types`, `get_custom_video_kwargs_for_relaunch` and
   `NOT_RELAUNCHABLE_STATUSES`, moved from `gaffer/core/match_launch.py` (which re-imports them). They only needed
   son, so the son-only lambda can now rerun custom feeds. Tests that patch S3 or Vidic for these functions must
@@ -120,8 +124,6 @@ wilson dev. QA at that head passes, with DB reads: a prematch match is stamped, 
   and for good if the run fails before it.
 - Follow-up MRs, not in !2981: expose `rerun_flagged_at` on the Gaffer match response; gaffer-front wording
   (stadium modal still says "Update and relaunch", lineup save says nothing).
-- The sweep calls `update_stadium` (a Heimspiel call) for each launch, as `relaunch_matches` does;
-  `block_preprocessing_gate=True` was offered to the reviewer as an option.
 - The dev Aurora (port 5432) is only reachable from the office network or the VPN. From a home network the
   Django shell fails with `OperationalError: connection timeout expired` while the dev API and AWS calls still
   work. Plan DB checkpoints for a day with that access, or run them before the sweep clears the stamps.
