@@ -28,24 +28,21 @@ def kubectl(*args: str, capture: bool = True, stdin: str | None = None) -> str:
     return (result.stdout or "").strip()
 
 
-def with_limit(command: list[str], limit: int) -> list[str]:
-    """Return the container command with its `--limit` value replaced (or added)."""
-    if "--limit" not in command:
-        return [*command, "--limit", str(limit)]
-    index = command.index("--limit") + 1
-    return [*command[:index], str(limit), *command[index + 1 :]]
+def with_args(command: list[str], job_args: list[str]) -> list[str]:
+    """Return the container command (`python -m <module> ...`) with its arguments replaced."""
+    return [*command[:3], *job_args]
 
 
-def trigger(cronjob: str, limit: int | None) -> str:
-    """Create a Job from the CronJob template (optionally with a new limit); return its name."""
+def trigger(cronjob: str, job_args: list[str]) -> str:
+    """Create a Job from the CronJob template (optionally with other arguments); return its name."""
     job = f"{cronjob}-manual-{int(time.time())}"
     source = f"--from=cronjob/football-metadata-service-dev-{cronjob}"
     manifest = json.loads(
         kubectl("create", "job", source, job, "--dry-run=client", "-o", "json")
     )
-    if limit is not None:
+    if job_args:
         container = manifest["spec"]["template"]["spec"]["containers"][0]
-        container["command"] = with_limit(container["command"], limit)
+        container["command"] = with_args(container["command"], job_args)
     kubectl("create", "-f", "-", stdin=json.dumps(manifest))
     print(f"created job/{job}")
     return job
@@ -70,15 +67,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cronjob", choices=sorted(CRONJOBS))
     parser.add_argument(
-        "--limit", type=int, help="override the CronJob's --limit (per entity type)"
+        "--timeout", type=int, default=90, help="minutes to wait (default 90)"
     )
     parser.add_argument(
-        "--timeout", type=int, default=90, help="minutes to wait (default 90)"
+        "job_args",
+        nargs="*",
+        help="after `--`: replace the CronJob's arguments, e.g. `-- --limit 100`"
+        " or `-- --type team_logo --competition 37`",
     )
     args = parser.parse_args()
     os.environ.setdefault("AWS_PROFILE", "Production.Skcr-Software-Common-Role")
 
-    job = trigger(args.cronjob, args.limit)
+    job = trigger(args.cronjob, args.job_args)
     ok = wait(job, args.timeout)
     kubectl("logs", f"job/{job}", capture=False)
     print(f"job/{job}: {'succeeded' if ok else 'FAILED'}")

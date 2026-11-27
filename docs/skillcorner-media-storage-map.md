@@ -1,6 +1,6 @@
 ---
 repo: [football-metadata-service, football-metadata-service-client, argocd, orion, orion-front, vidic-client]
-mr: [football-metadata-service!24, football-metadata-service-client!10, argocd-platform-services-football-metadata-service!30, argocd-platform-services-football-metadata-service!32]
+mr: [football-metadata-service!24, football-metadata-service-client!10, argocd-platform-services-football-metadata-service!30, argocd-platform-services-football-metadata-service!32, football-metadata-service!29, argocd-platform-services-football-metadata-service!43]
 verified_at: 2026-11-27
 source: https://app.notion.com/p/41b6552a98c980beb00dfdcb2d140dca
 ---
@@ -41,7 +41,7 @@ Status 2026-11-20: FMS !24, client !10, argocd !30 open as drafts; QA passed on 
     --dry-run=client -o yaml | sed 's/- "1000"/- "100"/' | kubectl create -f -
   kubectl get jobs -n $NS; kubectl logs -f job/<job-name> -n $NS
   ```
-  `uv run workflows/fms_dev_cron.py <ingest-metadata|refresh-images> [--limit N]` wraps the same steps, waits for the Job and exits non-zero on failure.
+  `uv run workflows/fms_dev_cron.py <ingest-metadata|refresh-images> [-- <job args>]` wraps the same steps, waits for the Job and exits non-zero on failure. Arguments after `--` replace the CronJob's own (`-- --limit 100`, `-- --type team_logo --competition 37`).
 - **FMS client locally without installing:** `uv run --no-project --python 3.13 --index internal=https://pypi.skillcorner.com/pypi/internal/simple/ --with 'football-metadata-service-client==<version>' --with httpx python …`. `--python 3.13` is required: uv otherwise picks free-threaded 3.14t, where `orjson` (via fitrequest) fails to build. `FootballMetadataServiceClient(env='dev')` uses M2M auth from SSM (needs the AWS profile). A pirlo prerelease of the client is `X.Y.Za0+<user>` built from the current pyproject version, so it sorts *below* the released `X.Y.Z` — pin it exactly.
 - **FMS API on dev:** the gateway needs a Cognito JWT even for `/api/health`. Use `kubectl port-forward svc/football-metadata-service-dev` plus the `X-User-Sub` header.
 - **QA runner gap:** `~/.claude/agents/qa/qa_run.py` has no shell/SQL step and cannot send custom headers, so FMS QA ran as manual steps.
@@ -50,15 +50,40 @@ Status 2026-11-20: FMS !24, client !10, argocd !30 open as drafts; QA passed on 
 - **fitrequest generated methods** drop the response content type and raise on 404; the client's `get_image` is written by hand on `self.session.synchronous` with `self.session.base_url` (that httpx client has no base_url).
 - **HEIMSPIEL re-encodes player photos on a CDN miss:** after Cloudflare's 4 h cache expires, the origin may return different bytes for the same photo, so a weekly refresh still rewrites part of the photos (dev QA: 73/93, then 0/93 with a warm cache). Logos were stable.
 
-## Findings for task 4435 (store by HEIMSPIEL id, 2026-11-27, FMS main at bdd8d18)
+## Task 4435: images stored by HEIMSPIEL id (FMS !29, chart !43, open drafts 2026-11-27)
 
-Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. State of the code before any change:
+Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. It replaces the task 4293 logic above once !29 merges; QA passed on dev (capped to co37, co19, co73).
 
-- **FMS matchings are a create-only snapshot.** `player_matching` / `team_matching` / `competition_matching` are written only by `create_matching` for entities absent from FMS. A matching fixed or removed in wilson, or a merged duplicate, never reaches FMS. Read-time resolution "our id → HEIMSPIEL id → key" needs a matching sync first.
-- **No inventory of stored images.** Only the three `has_*` flags exist (alembic head 003), and the IRSA role has no `s3:ListBucket`. Counts of stored / missing images need a HEAD per key, a ListBucket statement in the FMS pulumi stack, or a new table.
-- **dpc already wraps the three listing feeds** (`get_competition_list`, `get_teams_by_competition`, `get_team_squad`); `Role.group`, `Person.id` and the sport id are exposed. `get_teams_by_competition` does not filter placeholder teams (`is_placeholder`, dpc ≥ 1.14.0; FMS locks 1.12.2). The dpc client has no retry, cache or rate limit.
-- **No consumer of the images yet.** Orion imports the FMS client only for `get_player`; nothing in orion or orion-front calls `get_image` or reads the bucket. The ticket's "the Hub reads S3 directly" has no evidence in the mirrored repos.
-- `get_image(image_type, entity_id)` takes our id, so server-side resolution needs no client release.
+- **Why:** FMS matchings were a create-only snapshot of wilson, and images were keyed by our id. A matching fixed or removed in wilson, or a merged duplicate, never reached FMS.
+- **Keys:** `assets/heimspiel/player/photo/{person_id}.jpg`, `assets/heimspiel/team/logo/{team_id}.png`, `assets/heimspiel/competition/logo/{competition_id}.png` (bare digits). The old keys and the `has_*` columns stay, unread and unwritten, until the Hub switch.
+- **Weekly job** `python -m app.images [--type T] [--competition ID ...]` lists from HEIMSPIEL through data-provider-clients (≥ 1.14.0 for `is_placeholder`), no DB and no son:
+  - logos of every football competition (`/competition-list/`, sport id 1) and of its non-placeholder teams (`/teams-by-season/co{id}/`);
+  - photos of the `role.group == 'Athletes'` squad entries (`/team-squad/te{id}/`, id = `person.id`) of `settings.HEIMSPIEL_PHOTO_COMPETITION_IDS` (the 20 contract ids; 9 extension ids wait for the contract);
+  - `--competition` replaces the scope of the logos; photos are always intersected with the contract list;
+  - each feed is read once per run, retried once, and a failure makes the job exit 1 without stopping the run; nothing is deleted from S3;
+  - log lines `Photo report competition=co37 in_scope=… with_photo=… without_photo=… failed=…` and `Photo report total distinct_persons=… feed_failures=N` give the counts for the contract owner.
+- **Read:** `GET /api/images/{type}/{our_id}` resolves our id through the FMS HEIMSPIEL matching row at request time. No row or no object → the same 404. The client contract is unchanged.
+- **Matching sync:** each entity step of the daily `python -m app.ingestion` now reconciles the HEIMSPIEL matchings with wilson: one DELETE of removed and changed rows, then one INSERT, in one transaction (swapped ids cannot collide). A competition with several HEIMSPIEL ids keeps the earliest wilson matching. An empty wilson read with rows in FMS fails the step. Entity creation stays create-only; ingestion no longer pulls images. A fix in wilson shows after the next run (≤ 24 h).
+- **Rollout:** after the prod deploy every image answers 404 until both jobs have run once; run them by hand. Merge chart !43 with the image (`--limit` no longer exists on `app.images`).
+
+Facts measured on 2026-11-27:
+
+- `/competition-list/`: 234 football competitions (212 club, 22 national, 61 female), 3 basketball, 2 American football. 58 of the 234 have no logo.
+- **"No season logic" has a cost:** `/teams-by-season/co{id}/` returns HEIMSPIEL's current season only. MLS (co73) returned its 18 playoff clubs, not 30. The product owner accepted this.
+- Champions League (co19) lists the 36 league-phase clubs; 5 were outside the contract countries. All are in the photo scope (decision).
+- Photo coverage: co37 521 of 542, co19 1,067 of 1,197, co73 232 of 589. About 29 athletes per squad, so about 10,000 persons for the 20 leagues.
+- **The JSON feeds answer without credentials.** The FMS IRSA role cannot read `/HEIMSPIEL_USERNAME` / `/HEIMSPIEL_PASSWORD` (eu-central-1); dpc logs `Unable to retrieve AWS variable` twice and the calls still succeed.
+- Not run before prod: the uncapped listing (all 234 competitions for team logos, the 20 contract competitions for photos).
+- Follow-ups: enrichment keeps the old person's data after a matching change; nobody reads the images yet (see below); what the 12,000-photo cap counts is a question for the contract owner.
+
+QA and CI traps:
+
+- `uvx pirlo` fails on this machine (uv picks free-threaded 3.14t, `orjson` does not build); use the installed `~/.local/bin/pirlo`.
+- The kube context is `andrei_mitriakov@workloads-prod.us-east-1.eksctl.io`, not `workloads-prod`.
+- Finished Jobs are garbage-collected after a few minutes: save `kubectl logs job/…` at once.
+- `kubectl exec` into the API pod truncates large stdout; run feed scripts locally with dpc. Wait more than 3 s after `kubectl port-forward` before the first request.
+- FMS CI lints with the latest ruff and `prek` (`pretty-format-json` on fixtures), newer than the locked ruff: run `uvx ruff check --no-fix` and `uvx prek run --all-files` before the push.
+- The FMS mirror's `origin` is https without credentials: fetch and push with the SSH URL.
 
 ## What orion takes today
 

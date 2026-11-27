@@ -15,7 +15,7 @@ its line here in the same change. Line format: `- [title](docs/slug.md) — one-
 - [Infra team regular work](docs/infra-team-regular-work.md) — 6-month MR analysis of the 4 infra engineers: IAM tickets ~31%, Cognito, capacity tuning
 - [GitLab MR stats per developer](docs/gitlab-mr-stats-per-developer.md) — one GraphQL query for group-wide merged MRs with diff stats + approvers; bot, self-approval, lock-file and cross-team comparison traps; HR xlsx form must be edited as XML
 - [Notion All Tasks ticket runbook](docs/notion-tasks-ticket-runbook.md) — data source id, user id, Done-date automation overwrites backdating, Slack link rule
-- [SkillCorner media storage map](docs/skillcorner-media-storage-map.md) — HEIMSPIEL images in FMS (!24/!10/!30): daily + Wednesday jobs, flags, /api/images presigned SigV4; traps (S3Storage presign HEAD, SigV2, 302 missing, pirlo full path, dev one-off Jobs)
+- [SkillCorner media storage map](docs/skillcorner-media-storage-map.md) — HEIMSPIEL images in FMS: task 4293 (!24/!10/!30, keys by our id) and task 4435 (!29, keys by HEIMSPIEL id, listing from the feeds, read through the matching, daily matching sync); traps (current season only, feeds need no credentials, 302 missing, pirlo full path, dev one-off Jobs, CI ruff/prek)
 
 ## kickoff
 
