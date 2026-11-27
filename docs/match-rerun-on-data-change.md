@@ -7,9 +7,9 @@ source: https://app.notion.com/p/4226552a98c981848706de15a33da973
 
 # Match rerun after a sensitive data change (wilson !2981, open)
 
-State on 2026-11-27: MR open at head `81ff3035c`, lambda locked on son `0.105.0a4+andreimitriakov`. Dev holds
-`f35b9e2ab` (QA of 2026-11-26, results in the MR description); the human review changes of 2026-11-27 are not
-deployed. Notion task 4412. Verify against the branch before use.
+State on 2026-11-27: MR open at head `81ff3035c`, lambda locked on son `0.105.0a4+andreimitriakov`, deployed on
+wilson dev. QA at that head: API saves and the sweep pass (it relaunched `[2076621, 2070668]`, oldest first); the
+DB reads (`rerun_flagged_at`, statuses) are still pending, see the MR description. Notion task 4412. Verify against the branch before use.
 
 ## Design
 
@@ -122,6 +122,11 @@ deployed. Notion task 4412. Verify against the branch before use.
   (stadium modal still says "Update and relaunch", lineup save says nothing).
 - The sweep calls `update_stadium` (a Heimspiel call) for each launch, as `relaunch_matches` does;
   `block_preprocessing_gate=True` was offered to the reviewer as an option.
+- The dev Aurora (port 5432) is only reachable from the office network or the VPN. From a home network the
+  Django shell fails with `OperationalError: connection timeout expired` while the dev API and AWS calls still
+  work. Plan DB checkpoints for a day with that access, or run them before the sweep clears the stamps.
+- GitLab resolves a diff thread by itself when a push changes its lines (shown as resolved by the pusher): four
+  of the seven human threads closed that way; the other three stayed open for the reviewer.
 - The local test Postgres container (`wilson-test-pg`) does not restart with the machine: `docker start
   wilson-test-pg` when tests fail with "connection refused" on 5432.
 
