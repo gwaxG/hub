@@ -64,6 +64,7 @@ Ticket: https://app.notion.com/p/4236552a98c980d99e12e3076fa91312. It replaces t
   - log lines `Photo report competition=co37 in_scope=… with_photo=… without_photo=… failed=…` and `Photo report total distinct_persons=… feed_failures=N` give the counts for the contract owner.
 - **Read:** `GET /api/images/{type}/{our_id}` resolves our id through the FMS HEIMSPIEL matching row at request time. No row or no object → the same 404. The client contract is unchanged.
 - **Matching sync:** each entity step of the daily `python -m app.ingestion` now reconciles the HEIMSPIEL matchings with wilson: one DELETE of removed and changed rows, then one INSERT, in one transaction (swapped ids cannot collide). A competition with several HEIMSPIEL ids keeps the earliest wilson matching. An empty wilson read with rows in FMS fails the step. Entity creation stays create-only; ingestion no longer pulls images. A fix in wilson shows after the next run (≤ 24 h).
+- **Enrichment follows the sync:** every player whose matching the sync added or changed gets the `/person` profile of the current person (scalars overwritten, nationality and career rows replaced). A failed fetch clears the player's enrichment. Unchanged matching → no call; removed matching → data kept. `--limit` bounds creation only, not the profile calls.
 - **Rollout:** after the prod deploy every image answers 404 until both jobs have run once; run them by hand. Merge chart !43 with the image (`--limit` no longer exists on `app.images`).
 
 Facts measured on 2026-11-27:
@@ -74,7 +75,7 @@ Facts measured on 2026-11-27:
 - Photo coverage: co37 521 of 542, co19 1,067 of 1,197, co73 232 of 589. About 29 athletes per squad, so about 10,000 persons for the 20 leagues.
 - **The JSON feeds answer without credentials.** The FMS IRSA role cannot read `/HEIMSPIEL_USERNAME` / `/HEIMSPIEL_PASSWORD` (eu-central-1); dpc logs `Unable to retrieve AWS variable` twice and the calls still succeed.
 - Not run before prod: the uncapped listing (all 234 competitions for team logos, the 20 contract competitions for photos).
-- Follow-ups: enrichment keeps the old person's data after a matching change; nobody reads the images yet (see below); what the 12,000-photo cap counts is a question for the contract owner.
+- Follow-ups: an `enriched_heimspiel_id` marker (a failed fetch is not retried until the matching changes again; a DB error on one profile stops the enrichment of the rest of the run); nobody reads the images yet (see below); what the 12,000-photo cap counts is a question for the contract owner.
 
 QA and CI traps:
 
